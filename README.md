@@ -28,6 +28,7 @@ Please remember to configure the settings before indexing. They are saved betwee
 - **Cross-Platform**: Supports Windows, macOS ARM, and Linux
 - **Stop and Start Capability**: Can stop and start without having to reprocess all the files again
 - **One or Two Step Processing**: Can do keywords and a simple caption in one step, or keywords and a detailed caption in two steps
+- **Navigation**: Step backwards and forwards through the images and view the generated data as they are processed
  
 ## Important Information
 
