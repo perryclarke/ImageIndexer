@@ -3,4 +3,9 @@ tinydb
 json_repair
 uuid
 pyexiftool
-koboldapi
+pillow
+pillow_heif
+rawpy
+regex
+requests
+
