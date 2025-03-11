@@ -100,7 +100,7 @@ if exist koboldcpp.exe (
 )
 
 :gpu_prompt
-SET /P gpu="Does this system have a discrete nVidia GPU or higher with 4GB or more of VRAM? [y/n]: "
+SET /P gpu="Does this system have a discrete nVidia GPU? [y/n]: "
 echo %gpu%| findstr /i "^[yn]$" >nul
 if errorlevel 1 (
     echo Please enter y or n.
