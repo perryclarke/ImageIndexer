@@ -265,7 +265,7 @@ class SettingsDialog(QDialog):
         self.word_limit_layout.addWidget(self.word_limit_spinbox)
         self.word_limit_layout.addWidget(QLabel("words in keyword entry"))
         self.word_limit_layout.addStretch(1)
-        self.word_limit_checkbox_checkbox.setChecked(True)
+        self.word_limit_checkbox.setChecked(True)
         self.split_and_checkbox = QCheckBox("Split 'and'/'or' entries")
         self.split_and_checkbox.setChecked(True)
         self.ban_prompt_words_checkbox = QCheckBox("Ban prompt word repetitions")
