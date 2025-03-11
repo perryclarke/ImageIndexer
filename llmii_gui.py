@@ -828,7 +828,7 @@ class ImageIndexerGUI(QMainWindow):
         else:
             self.api_is_ready = False
             self.api_status_label.setText("API Status: Waiting for connection...")
-            self.api_status_label.setStyleSheet("color: red padding: 4px")
+            self.api_status_label.setStyleSheet("color: red; padding: 4px")
             self.run_button.setEnabled(False)
     
     def update_image_preview(self, base64_image, caption, keywords, filename):
