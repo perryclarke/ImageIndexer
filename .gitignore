@@ -1,0 +1,6 @@
+/llmii_env
+/dev
+settings.json
+*.gguf
+koboldcpp.exe
+/src/__pycache__
