@@ -265,7 +265,7 @@ class SettingsDialog(QDialog):
         self.word_limit_layout.addWidget(self.word_limit_spinbox)
         self.word_limit_layout.addWidget(QLabel("words in keyword entry"))
         self.word_limit_layout.addStretch(1)
-        
+        self.word_limit_checkbox_checkbox.setChecked(True)
         self.split_and_checkbox = QCheckBox("Split 'and'/'or' entries")
         self.split_and_checkbox.setChecked(True)
         self.ban_prompt_words_checkbox = QCheckBox("Ban prompt word repetitions")
@@ -828,7 +828,7 @@ class ImageIndexerGUI(QMainWindow):
         else:
             self.api_is_ready = False
             self.api_status_label.setText("API Status: Waiting for connection...")
-            self.api_status_label.setStyleSheet("color: red padding: 4px")
+            self.api_status_label.setStyleSheet("color: red; padding: 4px")
             self.run_button.setEnabled(False)
     
     def update_image_preview(self, base64_image, caption, keywords, filename):
