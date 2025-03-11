@@ -2,24 +2,156 @@ import sys
 import os
 import json
 import shutil
-import llmii
-from koboldapi import KoboldAPI
-from PyQt6.QtCore import QThread, pyqtSignal, QObject, Qt
+import base64
+import requests
+from PyQt6.QtCore import QThread, pyqtSignal, QObject, Qt, QSize
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                            QLabel, QLineEdit, QCheckBox, QPushButton, QFileDialog, 
                            QTextEdit, QGroupBox, QSpinBox, QRadioButton, QButtonGroup,
                            QProgressBar, QTableWidget, QTableWidgetItem, QComboBox,
                            QPlainTextEdit, QScrollArea, QMessageBox, QDialog, QMenuBar,
-                           QMenu, QSizePolicy)
+                           QMenu, QSizePolicy, QSplitter, QFrame)
+from PyQt6.QtGui import QPixmap, QImage
+from src import llmii, image_processor
+from src.help_text import get_settings_help
 
+class GuiConfig:
+    """ Configuration class for GUI dimensions and properties
+    """
+    WINDOW_WIDTH = 704
+    WINDOW_HEIGHT = 740
+    WINDOW_FIXED = True
+    
+    IMAGE_PREVIEW_WIDTH = 340
+    IMAGE_PREVIEW_HEIGHT = 360
+    
+    METADATA_WIDTH = 360
+    METADATA_HEIGHT = 360
+    
+    LOG_WIDTH = 700
+    LOG_HEIGHT = 250
+    
+    CONTROL_PANEL_HEIGHT = 80
+    SPLITTER_HANDLE_WIDTH = 4
+    
+    SETTINGS_HEIGHT = 660
+    SETTINGS_WIDTH = 460
+    
+    FONT_SIZE_NORMAL = 10
+    FONT_SIZE_HEADER = 11
+    
+    COLOR_KEYWORD_BG = "#e1f0ff"
+    COLOR_KEYWORD_TEXT = "#0066cc"
+    COLOR_KEYWORD_BORDER = "#99ccff"
+    COLOR_CAPTION_BG = "#f9f9f9"
+    COLOR_BORDER = "#cccccc"
+    
+    CONTENT_MARGINS = 1
+    SPACING = 0
+    KEYWORDS_PER_ROW = 4
+    FILENAME_LABEL_HEIGHT = 24
+    CAPTION_BOX_HEIGHT = 200
+    KEYWORDS_BOX_HEIGHT = abs(METADATA_HEIGHT - (FILENAME_LABEL_HEIGHT + CAPTION_BOX_HEIGHT))
+    DEFAULT_INSTRUCTION = """The tasks are to describe the image and to come up with a large set of keyword tags for it.
+
+Write the Description using the active voice.
+
+The Keywords must be one or two words each. Generate as many Keywords as possible using a controlled and consistent vocabulary.
+
+For both Description and Keywords, make sure to include:
+
+ - Themes, concepts
+ - Items, animals, objects
+ - Structures, landmarks, setting
+ - Foreground and background elements   
+ - Notable colors, textures, styles
+ - Actions, activities
+
+If humans are present, include: 
+ - Physical appearance
+ - Gender
+ - Clothing 
+ - Age range
+ - Visibly apparent ancestry
+ - Occupation/role
+ - Relationships between individuals
+ - Emotions, expressions, body language
+
+Use ENGLISH only. Generate ONLY a JSON object with the keys Description and Keywords as follows {"Description": str, "Keywords": []}
+<EXAMPLE>
+The example input would be a stock photo of two apples, one red and one green, against a white backdrop and is a hypothetical Description and Keyword for a non-existent image.
+OUTPUT=```json{"Description": "Two apples next to each other, one green and one red, placed side by side against a white background. There is even and diffuse studio lighting. The fruit is glossy and covered with dropplets of water indicating they are fresh and recently washed. The image emphasizes the cleanliness and appetizing nature of the food", "Keywords": ["studio shot","green","fruit","red","apple","stock image","health food","appetizing","empty background","grocery","food","snack"]}```
+</EXAMPLE> """
+                
+class InstructionDialog(QDialog):
+    def __init__(self, instruction_text, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Edit Instruction")
+        self.setModal(True)
+        self.resize(700, 500)
+        
+        layout = QVBoxLayout(self)
+        
+        self.instruction_input = QPlainTextEdit()
+        self.instruction_input.setPlainText(instruction_text)
+        layout.addWidget(QLabel("Edit Instruction:"))
+        layout.addWidget(self.instruction_input)
+        
+        button_layout = QHBoxLayout()
+        save_button = QPushButton("Save")
+        save_button.clicked.connect(self.accept)
+        cancel_button = QPushButton("Cancel")
+        cancel_button.clicked.connect(self.reject)
+        button_layout.addWidget(save_button)
+        button_layout.addWidget(cancel_button)
+        layout.addLayout(button_layout)
+    
+    def get_instruction(self):
+        return self.instruction_input.toPlainText()
+
+class SettingsHelpDialog(QDialog):
+    """ Dialog that shows help information for all settings """
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Settings Help")
+        self.resize(600, 500)
+        
+        layout = QVBoxLayout(self)
+        
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        
+        from src.help_text import get_settings_help
+        help_label = QLabel(get_settings_help())
+        help_label.setWordWrap(True)
+        help_label.setTextFormat(Qt.TextFormat.RichText)
+        help_label.setOpenExternalLinks(True)
+        
+        scroll_area.setWidget(help_label)
+        layout.addWidget(scroll_area)
+        
+        button_layout = QHBoxLayout()
+        close_button = QPushButton("Close")
+        close_button.clicked.connect(self.accept)
+        button_layout.addStretch(1)
+        button_layout.addWidget(close_button)
+        layout.addLayout(button_layout)
+        
 class SettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setModal(True)
-        self.resize(600, 400)
+        self.resize(GuiConfig.SETTINGS_WIDTH, GuiConfig.SETTINGS_HEIGHT)
         
         layout = QVBoxLayout(self)
+        
+        # Scroll area in case it gets too long
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
         
         api_layout = QHBoxLayout()
         self.api_url_input = QLineEdit("http://localhost:5001")
@@ -28,27 +160,33 @@ class SettingsDialog(QDialog):
         api_layout.addWidget(self.api_url_input)
         api_layout.addWidget(QLabel("API Password:"))
         api_layout.addWidget(self.api_password_input)
-        layout.addLayout(api_layout)
+        scroll_layout.addLayout(api_layout)
 
         system_instruction_layout = QHBoxLayout()
-        self.system_instruction_input = QLineEdit("You are a helpful assistant.")
+        self.system_instruction_input = QLineEdit("You describe the image and generate keywords.")
         system_instruction_layout.addWidget(QLabel("System Instruction:"))
         system_instruction_layout.addWidget(self.system_instruction_input)
-        layout.addLayout(system_instruction_layout)
+        scroll_layout.addLayout(system_instruction_layout)
+
+        instruction_button_layout = QHBoxLayout()
+        self.edit_instruction_button = QPushButton("Edit Instruction")
+        self.edit_instruction_button.clicked.connect(self.edit_instruction)
+        instruction_button_layout.addWidget(self.edit_instruction_button)
+        scroll_layout.addLayout(instruction_button_layout)
 
         caption_group = QGroupBox("Caption Options")
         caption_layout = QVBoxLayout()
 
         caption_instruction_layout = QHBoxLayout()
-        self.caption_instruction_input = QLineEdit("Describe the image.")
+        self.caption_instruction_input = QLineEdit("Describe the image in detail. Be specific.")
         caption_instruction_layout.addWidget(QLabel("Caption Instruction:"))
         caption_instruction_layout.addWidget(self.caption_instruction_input)
         caption_layout.addLayout(caption_instruction_layout)
 
         self.caption_radio_group = QButtonGroup(self)
-        self.detailed_caption_radio = QRadioButton("Generate a detailed caption (takes two LLM queries)")
-        self.short_caption_radio = QRadioButton("Generate a short caption (single LLM query)")
-        self.no_caption_radio = QRadioButton("Do not add a caption")
+        self.detailed_caption_radio = QRadioButton("Separate caption query")
+        self.short_caption_radio = QRadioButton("Combined caption query")
+        self.no_caption_radio = QRadioButton("No caption query")
 
         self.caption_radio_group.addButton(self.detailed_caption_radio)
         self.caption_radio_group.addButton(self.short_caption_radio)
@@ -61,7 +199,7 @@ class SettingsDialog(QDialog):
         caption_layout.addWidget(self.no_caption_radio)
 
         caption_group.setLayout(caption_layout)
-        layout.addWidget(caption_group)
+        scroll_layout.addWidget(caption_group)
 
         gen_count_layout = QHBoxLayout()
         self.gen_count = QSpinBox()
@@ -70,19 +208,19 @@ class SettingsDialog(QDialog):
         self.gen_count.setValue(150)
         gen_count_layout.addWidget(QLabel("GenTokens: "))
         gen_count_layout.addWidget(self.gen_count)
-        layout.addLayout(gen_count_layout)
+        scroll_layout.addLayout(gen_count_layout)
         
         options_group = QGroupBox("File Options")
         options_layout = QVBoxLayout()
         
-        self.no_crawl_checkbox = QCheckBox("Don't crawl subdirectories")
-        self.reprocess_all_checkbox = QCheckBox("Reprocess all files again")
-        self.reprocess_failed_checkbox = QCheckBox("Reprocess previously failed files")
-        self.reprocess_orphans_checkbox = QCheckBox("If file has UUID, mark status (recommended)")
-        self.no_backup_checkbox = QCheckBox("Don't make backups")
-        self.dry_run_checkbox = QCheckBox("Pretend mode / Dry run")
-        self.skip_verify_checkbox = QCheckBox("No file checking (not recommended)")
-        self.quick_fail_checkbox = QCheckBox("Quick fail (recommended for newer models)")
+        self.no_crawl_checkbox = QCheckBox("Don't go in subdirectories")
+        self.reprocess_all_checkbox = QCheckBox("Reprocess everything")
+        self.reprocess_failed_checkbox = QCheckBox("Reprocess failures")
+        self.reprocess_orphans_checkbox = QCheckBox("Fix any orphans")
+        self.no_backup_checkbox = QCheckBox("No backups")
+        self.dry_run_checkbox = QCheckBox("Pretend mode")
+        self.skip_verify_checkbox = QCheckBox("No file validation")
+        self.quick_fail_checkbox = QCheckBox("No retries")
         
         options_layout.addWidget(self.no_crawl_checkbox)
         options_layout.addWidget(self.reprocess_all_checkbox)
@@ -94,31 +232,92 @@ class SettingsDialog(QDialog):
         options_layout.addWidget(self.quick_fail_checkbox)
         
         options_group.setLayout(options_layout)
-        layout.addWidget(options_group)
+        scroll_layout.addWidget(options_group)
         
-        xmp_group = QGroupBox("Metadata Options")
+        xmp_group = QGroupBox("Existing Metadata")
         xmp_layout = QVBoxLayout()
         
-        self.update_keywords_checkbox = QCheckBox("Add new keywords to existing keywords")
+        self.update_keywords_checkbox = QCheckBox("Don't clear existing keywords (new will be added)")
         self.update_keywords_checkbox.setChecked(True)
-        self.update_caption_checkbox = QCheckBox("Add new caption to existing caption with <caption>")
+        self.update_caption_checkbox = QCheckBox("Don't clear existing caption (new will be added surrounded by tags)")
         self.update_caption_checkbox.setChecked(False)
+        
         xmp_layout.addWidget(self.update_keywords_checkbox)
         xmp_layout.addWidget(self.update_caption_checkbox)
         
         xmp_group.setLayout(xmp_layout)
-        layout.addWidget(xmp_group)
+        scroll_layout.addWidget(xmp_group)
+
+        keyword_corrections_group = QGroupBox("Keyword Corrections")
+        corrections_layout = QVBoxLayout()
+        
+        #self.normalize_keywords_checkbox = QCheckBox("Normalize keywords")
+        #self.normalize_keywords_checkbox.setChecked(True)
+        self.depluralize_checkbox = QCheckBox("Depluralize keywords")
+        self.depluralize_checkbox.setChecked(True)
+        self.word_limit_layout = QHBoxLayout()
+        self.word_limit_checkbox = QCheckBox("Limit to")
+        self.word_limit_spinbox = QSpinBox()
+        self.word_limit_spinbox.setMinimum(1)
+        self.word_limit_spinbox.setMaximum(5)
+        self.word_limit_spinbox.setValue(2)
+        self.word_limit_layout.addWidget(self.word_limit_checkbox)
+        self.word_limit_layout.addWidget(self.word_limit_spinbox)
+        self.word_limit_layout.addWidget(QLabel("words in keyword entry"))
+        self.word_limit_layout.addStretch(1)
+        
+        self.split_and_checkbox = QCheckBox("Split 'and'/'or' entries")
+        self.split_and_checkbox.setChecked(True)
+        self.ban_prompt_words_checkbox = QCheckBox("Ban prompt word repetitions")
+        self.ban_prompt_words_checkbox.setChecked(True)
+        self.no_digits_start_checkbox = QCheckBox("Cannot start with 3+ digits")
+        self.no_digits_start_checkbox.setChecked(True)
+        self.min_word_length_checkbox = QCheckBox("Words must be 2+ characters")
+        self.min_word_length_checkbox.setChecked(True)
+        self.latin_only_checkbox = QCheckBox("Only Latin characters")
+        self.latin_only_checkbox.setChecked(True)
+        
+        #corrections_layout.addWidget(self.normalize_keywords_checkbox)
+        corrections_layout.addWidget(self.depluralize_checkbox)
+        corrections_layout.addLayout(self.word_limit_layout)
+        corrections_layout.addWidget(self.split_and_checkbox)
+        corrections_layout.addWidget(self.ban_prompt_words_checkbox)
+        corrections_layout.addWidget(self.no_digits_start_checkbox)
+        corrections_layout.addWidget(self.min_word_length_checkbox)
+        corrections_layout.addWidget(self.latin_only_checkbox)
+        
+        keyword_corrections_group.setLayout(corrections_layout)
+        scroll_layout.addWidget(keyword_corrections_group)
+        
+        scroll_area.setWidget(scroll_content)
+        layout.addWidget(scroll_area, 1)
         
         button_layout = QHBoxLayout()
+        help_button = QPushButton("Help")
+        help_button.clicked.connect(self.show_help)
         save_button = QPushButton("Save")
         save_button.clicked.connect(self.accept)
         cancel_button = QPushButton("Cancel")
         cancel_button.clicked.connect(self.reject)
+        button_layout.addWidget(help_button)
+        button_layout.addStretch(1)
         button_layout.addWidget(save_button)
         button_layout.addWidget(cancel_button)
         layout.addLayout(button_layout)
+
+        self.instruction_text = GuiConfig.DEFAULT_INSTRUCTION
         
         self.load_settings()
+ 
+    def show_help(self):
+        """Show the settings help dialog"""
+        dialog = SettingsHelpDialog(self)
+        dialog.exec()
+        
+    def edit_instruction(self):
+        dialog = InstructionDialog(self.instruction_text, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.instruction_text = dialog.get_instruction()
      
     def load_settings(self):
         try:
@@ -130,6 +329,8 @@ class SettingsDialog(QDialog):
                 self.api_password_input.setText(settings.get('api_password', ''))
                 self.system_instruction_input.setText(settings.get('system_instruction', 'You are a helpful assistant.'))
                 self.gen_count.setValue(settings.get('gen_count', 150))
+                
+                self.instruction_text = settings.get('instruction', GuiConfig.DEFAULT_INSTRUCTION)
                 
                 self.no_crawl_checkbox.setChecked(settings.get('no_crawl', False))
                 self.reprocess_failed_checkbox.setChecked(settings.get('reprocess_failed', False))
@@ -152,7 +353,18 @@ class SettingsDialog(QDialog):
                     
                 self.update_keywords_checkbox.setChecked(settings.get('update_keywords', True))
                 self.update_caption_checkbox.setChecked(settings.get('update_caption', False))
-                    
+                
+                # Load keyword correction settings
+                #self.normalize_keywords_checkbox.setChecked(settings.get('normalize_keywords', True))
+                self.depluralize_checkbox.setChecked(settings.get('depluralize_keywords', True))
+                self.word_limit_checkbox.setChecked(settings.get('limit_word_count', True))
+                self.word_limit_spinbox.setValue(settings.get('max_words_per_keyword', 2))
+                self.split_and_checkbox.setChecked(settings.get('split_and_entries', True))
+                self.ban_prompt_words_checkbox.setChecked(settings.get('ban_prompt_words', True))
+                self.no_digits_start_checkbox.setChecked(settings.get('no_digits_start', True))
+                self.min_word_length_checkbox.setChecked(settings.get('min_word_length', True))
+                self.latin_only_checkbox.setChecked(settings.get('latin_only', True))    
+        
         except Exception as e:
             print(f"Error loading settings: {e}")
             
@@ -161,6 +373,7 @@ class SettingsDialog(QDialog):
             'api_url': self.api_url_input.text(),
             'api_password': self.api_password_input.text(),
             'system_instruction': self.system_instruction_input.text(),
+            'instruction': self.instruction_text,
             'gen_count': self.gen_count.value(),
             'no_crawl': self.no_crawl_checkbox.isChecked(),
             'reprocess_failed': self.reprocess_failed_checkbox.isChecked(),
@@ -176,6 +389,15 @@ class SettingsDialog(QDialog):
             'short_caption': self.short_caption_radio.isChecked(),
             'no_caption': self.no_caption_radio.isChecked(),
             'update_caption': self.update_caption_checkbox.isChecked(),
+            #'normalize_keywords': self.normalize_keywords_checkbox.isChecked(),
+            'depluralize_keywords': self.depluralize_checkbox.isChecked(),
+            'limit_word_count': self.word_limit_checkbox.isChecked(),
+            'max_words_per_keyword': self.word_limit_spinbox.value(),
+            'split_and_entries': self.split_and_checkbox.isChecked(),
+            'ban_prompt_words': self.ban_prompt_words_checkbox.isChecked(),
+            'no_digits_start': self.no_digits_start_checkbox.isChecked(),
+            'min_word_length': self.min_word_length_checkbox.isChecked(),
+            'latin_only': self.latin_only_checkbox.isChecked(),
         }
         
         try:
@@ -193,23 +415,28 @@ class APICheckThread(QThread):
         self.running = True
         
     def run(self):
+
         while self.running:
             try:
-                api = KoboldAPI(self.api_url)
-                version = api.get_version()
-                if version:
+                # Direct HTTP request to the version endpoint
+                response = requests.get(f"{self.api_url}/api/extra/version", timeout=5)
+                if response.status_code == 200:
                     self.api_status.emit(True)
                     break
-            except:
+                response = requests.get(f"{self.api_url}/health", timeout=5)
+                if response.status_code == 200:
+                    self.api_status.emit(True)
+                    break
+            except Exception:
                 self.api_status.emit(False)
             self.msleep(1000)
             
     def stop(self):
         self.running = False
         
-
 class IndexerThread(QThread):
     output_received = pyqtSignal(str)
+    image_processed = pyqtSignal(str, str, list, str)  # base64_image, caption, keywords, filename
 
     def __init__(self, config):
         super().__init__()
@@ -217,9 +444,24 @@ class IndexerThread(QThread):
         self.paused = False
         self.stopped = False
 
+    def process_callback(self, message):
+        """Callback for llmii's process_file function"""
+        # Check if message is a dictionary with image data
+        if isinstance(message, dict) and 'type' in message and message['type'] == 'image_data':
+            # Extract the image data and emit signal
+            base64_image = message.get('base64_image', '')
+            caption = message.get('caption', '')
+            keywords = message.get('keywords', [])
+            file_path = message.get('file_path', '')
+            self.image_processed.emit(base64_image, caption, keywords, file_path)
+        else:
+            # Regular text message for the log
+            self.output_received.emit(str(message))
+
     def run(self):
         try:
-            llmii.main(self.config, self.output_received.emit, self.check_paused_or_stopped)
+            # Pass our callback function to llmii
+            llmii.main(self.config, self.process_callback, self.check_paused_or_stopped)
         except Exception as e:
             self.output_received.emit(f"Error: {str(e)}")
 
@@ -233,6 +475,88 @@ class IndexerThread(QThread):
                 raise Exception("Indexer stopped by user")
         return self.paused
 
+class KeywordWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.keywords = []
+        self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS)
+        
+        # Create the container for keyword rows
+        self.keywords_container = QWidget()
+        self.keywords_layout = QVBoxLayout(self.keywords_container)
+        self.keywords_container.setStyleSheet("border: none; padding: 2px")
+        self.keywords_layout.setContentsMargins(GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS)
+        self.keywords_layout.setSpacing(0)
+        self.keywords_layout.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        
+        # Set fixed size policy for container
+        self.keywords_container.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        
+        # Add header and container to layout
+        #self.layout.addWidget(QLabel("Keywords:"))
+        self.layout.addWidget(self.keywords_container)
+        
+        # Ensure widget doesn't expand beyond its allocated space
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+    
+    def clear(self):
+        # Clear keywords layout
+        for i in reversed(range(self.keywords_layout.count())): 
+            widget = self.keywords_layout.itemAt(i).widget()
+            if widget:
+                widget.deleteLater()
+        self.keywords = []
+    
+    def set_keywords(self, keywords):
+        self.clear()
+        self.keywords = keywords
+        
+        # Display keywords in rows
+        max_per_row = GuiConfig.KEYWORDS_PER_ROW
+        current_row = 0
+        row_layouts = []
+        
+        # Create the first row
+        row_widget = QWidget()
+        row_layout = QHBoxLayout(row_widget)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(0)
+        row_layouts.append(row_layout)
+        self.keywords_layout.addWidget(row_widget)
+        
+        # Add keyword labels
+        for i, keyword in enumerate(keywords):
+            # Check if we need to start a new row
+            if i > 0 and i % max_per_row == 0:
+                # Create a new row
+                row_widget = QWidget()
+                row_layout = QHBoxLayout(row_widget)
+                row_layout.setContentsMargins(0, 0, 0, 0)
+                row_layout.setSpacing(0)
+                row_layouts.append(row_layout)
+                self.keywords_layout.addWidget(row_widget)
+                current_row += 1
+                
+            # Create the keyword label
+            keyword_label = QLabel(keyword)
+            keyword_label.setStyleSheet(f"""
+                background-color: {GuiConfig.COLOR_KEYWORD_BG}; 
+                color: {GuiConfig.COLOR_KEYWORD_TEXT};
+                padding: 1px 4px;
+                border-radius: 5px;
+                border: 1px solid {GuiConfig.COLOR_KEYWORD_BORDER};
+                margin: 1px;
+                font-size: {GuiConfig.FONT_SIZE_NORMAL}px;
+            """)
+            
+            # Add the keyword to the current row
+            row_layouts[current_row].addWidget(keyword_label)
+        
+        # Add stretch to each row to push keywords to the left
+        for row_layout in row_layouts:
+            row_layout.addStretch(1)
+
 class PauseHandler(QObject):
     pause_signal = pyqtSignal(bool)
     stop_signal = pyqtSignal()
@@ -240,16 +564,27 @@ class PauseHandler(QObject):
 class ImageIndexerGUI(QMainWindow):
     def __init__(self):
         super().__init__()
+        
+        # Apply fixed window size
         self.setWindowTitle("Image Indexer GUI")
-        self.setGeometry(100, 100, 800, 600)
+        self.setFixedSize(GuiConfig.WINDOW_WIDTH, GuiConfig.WINDOW_HEIGHT)
+        # Disable maximize button and resizing
+        if GuiConfig.WINDOW_FIXED:
+            self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowMaximizeButtonHint)
+            self.setFixedSize(GuiConfig.WINDOW_WIDTH, GuiConfig.WINDOW_HEIGHT)
+            
         self.settings_dialog = SettingsDialog(self)
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        layout = QVBoxLayout(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setSpacing(4)
+        main_layout.setContentsMargins(GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS)
         
-        fixed_content = QWidget()
-        fixed_layout = QVBoxLayout(fixed_content)
-        fixed_layout.setContentsMargins(0, 0, 0, 0)
+        # Upper section with controls - fixed height
+        controls_widget = QWidget()
+        controls_layout = QVBoxLayout(controls_widget)
+        controls_layout.setContentsMargins(0, 0, 0, 0)
+        controls_layout.setSpacing(GuiConfig.SPACING)
         
         # Directory and Settings section
         dir_layout = QHBoxLayout()
@@ -259,55 +594,19 @@ class ImageIndexerGUI(QMainWindow):
         dir_layout.addWidget(QLabel("Directory:"))
         dir_layout.addWidget(self.dir_input)
         dir_layout.addWidget(dir_button)
-        fixed_layout.addLayout(dir_layout)
+        controls_layout.addLayout(dir_layout)
 
-        # Settings button section
-        settings_layout = QHBoxLayout()
+        # Settings button and API status in one row
+        settings_api_layout = QHBoxLayout()
         settings_button = QPushButton("Settings")
         settings_button.clicked.connect(self.show_settings)
-        settings_layout.addWidget(settings_button)
-        fixed_layout.addLayout(settings_layout)
-
         self.api_status_label = QLabel("API Status: Checking...")
-        layout.addWidget(self.api_status_label)
+        settings_api_layout.addWidget(settings_button)
+        settings_api_layout.addStretch(1)
+        settings_api_layout.addWidget(self.api_status_label)
+        controls_layout.addLayout(settings_api_layout)
         
-        # Create a tabbed layout for instructions
-        instruction_group = QGroupBox("Instructions")
-        instruction_layout = QVBoxLayout()
-        
-        # Keyword generation instructions
-        self.instruction_input = QPlainTextEdit()
-        default_instruction = """First, generate a detailed caption for the image.
-
-Next, generate 7 unique one or two word keywords for the image. Include the following when present:
-
- - Themes, concepts
- - Items, animals, objects
-   - Key features, aspects
- - Structures, landmarks, setting
-   - Foreground and background elements   
- - Notable colors, textures, styles
- - Actions, activities
- - Human demographics:
-   - Physical appearance
-   - Age range
-   - Apparent ancestry
-   - Visible occupation/role
-   - Obvious relationships between individuals
-   - Clearly conveyed emotions, expressions, body language
-   
-Limit response to things clearly and obviously apparent; do not guess. Do not combine words. Use ENGLISH only. Generate ONLY a JSON object with the keys Caption and Keywords as follows {"Caption": str, "Keywords": []}"""
-        
-        self.instruction_input.setPlainText(default_instruction)
-        self.instruction_input.setFixedHeight(350)
-        
-        
-        instruction_layout.addWidget(QLabel("Instruction:"))
-        instruction_layout.addWidget(self.instruction_input)
-        
-        instruction_group.setLayout(instruction_layout)
-        fixed_layout.addWidget(instruction_group)
-        
+        # Control buttons
         button_layout = QHBoxLayout()
         self.run_button = QPushButton("Run Image Indexer")
         self.run_button.clicked.connect(self.run_indexer)
@@ -320,27 +619,153 @@ Limit response to things clearly and obviously apparent; do not guess. Do not co
         button_layout.addWidget(self.run_button)
         button_layout.addWidget(self.pause_button)
         button_layout.addWidget(self.stop_button)
-        fixed_layout.addLayout(button_layout)
-
-        layout.addWidget(fixed_content)
-
-        output_widget = QWidget()
-        output_layout = QVBoxLayout(output_widget)
-        output_layout.setContentsMargins(0, 0, 0, 0)
+        controls_layout.addLayout(button_layout)
         
+        # Set fixed height for controls widget
+        controls_widget.setFixedHeight(GuiConfig.CONTROL_PANEL_HEIGHT)
+        main_layout.addWidget(controls_widget)
+        nav_widget = QWidget()
+        
+        nav_layout = QHBoxLayout(nav_widget)
+        nav_layout.setContentsMargins(GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS)
+        nav_layout.setSpacing(GuiConfig.SPACING)
+
+        # Create navigation buttons
+        self.first_button = QPushButton("|<")  # Go to first image
+        self.prev_button = QPushButton("<")    # Go to previous image
+        self.position_label = QLabel("No images processed")
+        self.position_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.next_button = QPushButton(">")    # Go to next image
+        self.last_button = QPushButton(">|")   # Go to most recent image
+
+        # Add widgets to layout
+        nav_layout.addWidget(self.first_button)
+        nav_layout.addWidget(self.prev_button)
+        nav_layout.addStretch(1)
+        nav_layout.addWidget(self.position_label)
+        nav_layout.addStretch(1)
+        nav_layout.addWidget(self.next_button)
+        nav_layout.addWidget(self.last_button)
+
+        # Connect button signals to slots
+        self.first_button.clicked.connect(self.navigate_first)
+        self.prev_button.clicked.connect(self.navigate_prev)
+        self.next_button.clicked.connect(self.navigate_next)
+        self.last_button.clicked.connect(self.navigate_last)
+
+        # Set initial button states (disabled until we have images)
+        self.first_button.setEnabled(False)
+        self.prev_button.setEnabled(False)
+        self.next_button.setEnabled(False)
+        self.last_button.setEnabled(False)
+
+        # Add to the main layout
+        main_layout.addWidget(nav_widget)
+        
+        # Middle section with image and metadata side by side
+        middle_section = QWidget()
+        middle_layout = QHBoxLayout(middle_section)
+        middle_layout.setContentsMargins(0, 0, 0, 0)
+        middle_layout.setSpacing(GuiConfig.SPACING)
+        
+        # Image preview panel - fixed size
+        image_frame = QFrame()
+        image_frame.setFrameShape(QFrame.Shape.Box)
+        image_frame.setStyleSheet(f"border: 1px solid {GuiConfig.COLOR_BORDER};")
+        
+        image_layout = QVBoxLayout(image_frame)
+        image_layout.setContentsMargins(GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS)
+        
+        # Image preview label with fixed size
+        self.image_preview = QLabel("No image processed yet")
+        self.image_preview.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.image_preview.setFixedSize(GuiConfig.IMAGE_PREVIEW_WIDTH, GuiConfig.IMAGE_PREVIEW_HEIGHT)
+        self.image_preview.setFrameShape(QFrame.Shape.NoFrame)
+        self.image_preview.setStyleSheet("border: none;")
+               
+        image_layout.addWidget(self.image_preview, 0, Qt.AlignmentFlag.AlignCenter)
+        
+        image_frame.setFixedSize(GuiConfig.IMAGE_PREVIEW_WIDTH, GuiConfig.IMAGE_PREVIEW_HEIGHT)
+        middle_layout.addWidget(image_frame)
+        
+        # Metadata panel - fixed size
+        metadata_frame = QFrame()
+        
+        metadata_frame.setFrameShape(QFrame.Shape.Box)
+        metadata_frame.setStyleSheet(f"border: 1px solid {GuiConfig.COLOR_BORDER};")
+        #metadata_frame.setStyleSheet("")
+        metadata_layout = QVBoxLayout(metadata_frame)
+        metadata_layout.setContentsMargins(GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS)
+        metadata_layout.setSpacing(GuiConfig.SPACING)
+        
+        # Image filename
+        self.filename_label = QLabel("Filename: ")
+        self.filename_label.setStyleSheet("font-weight: bold; border:none;")
+        self.filename_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self.filename_label.setFixedHeight(GuiConfig.FILENAME_LABEL_HEIGHT)
+        
+        metadata_layout.addWidget(self.filename_label)
+        
+        # Caption
+        caption_group = QGroupBox("Caption")
+        caption_group.setStyleSheet("QGroupBox { border: none; }")
+        caption_layout = QVBoxLayout(caption_group)
+        
+        caption_layout.setContentsMargins(GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS)
+        caption_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self.caption_label = QLabel("No caption generated yet")
+        self.caption_label.setWordWrap(True)
+        #self.caption_label.setFrameStyle(QFrame.Shape.NoFrame)
+        self.caption_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self.caption_label.setStyleSheet(f"background-color: {GuiConfig.COLOR_CAPTION_BG}; padding: 4px;")
+        
+        # Create a scroll area for caption to ensure it fits in fixed space
+        caption_scroll = QScrollArea()
+        caption_scroll.setWidgetResizable(True)
+        caption_scroll.setWidget(self.caption_label)
+        caption_scroll.setFixedHeight(200)  # Ensure fixed height for caption area
+        caption_scroll.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        caption_layout.addWidget(caption_scroll, 0, Qt.AlignmentFlag.AlignTop)
+        metadata_layout.addWidget(caption_group, 0, Qt.AlignmentFlag.AlignTop)
+        
+        # Keywords
+        self.keywords_widget = KeywordWidget()
+        metadata_layout.addWidget(self.keywords_widget)
+        
+        # Set fixed size for metadata frame
+        metadata_frame.setFixedSize(GuiConfig.METADATA_WIDTH, GuiConfig.METADATA_HEIGHT)
+        middle_layout.addWidget(metadata_frame)
+        
+        # Add middle section to main layout
+        main_layout.addWidget(middle_section)
+        
+        # Bottom section - log output with fixed size
+        log_frame = QFrame()
+        log_frame.setFrameShape(QFrame.Shape.Box)
+        log_frame.setFrameStyle(QFrame.Shape.NoFrame)
+        log_layout = QVBoxLayout(log_frame)
+        log_layout.setContentsMargins(GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS, GuiConfig.CONTENT_MARGINS)
+        log_label = QLabel("Processing Log:")
+        log_layout.addWidget(log_label)
         self.output_area = QTextEdit()
         self.output_area.setReadOnly(True)
-        output_layout.addWidget(QLabel("Output:"))
-        output_layout.addWidget(self.output_area)
+        log_layout.addWidget(self.output_area)
         
-        layout.addWidget(output_widget)
-
+        # Set fixed size for log frame
+        log_frame.setFixedSize(GuiConfig.LOG_WIDTH, GuiConfig.LOG_HEIGHT)
+        main_layout.addWidget(log_frame)
+        
+        # Store the previous image data to keep showing something
+        self.previous_image_data = None
+        self.previous_caption = None
+        self.previous_keywords = None
+        self.previous_filename = None
         self.pause_handler = PauseHandler()
-        
         self.api_check_thread = None
         self.api_is_ready = False
-        
         self.run_button.setEnabled(False)
+        self.image_history = []  # [(base64_image, caption, keywords, filename)]
+        self.current_position = -1
         
         if os.path.exists('settings.json'):
             try:
@@ -357,10 +782,8 @@ Limit response to things clearly and obviously apparent; do not guess. Do not co
 
     def show_settings(self):
         if self.settings_dialog.exec() == QDialog.DialogCode.Accepted:
-            # First save settings from the settings dialog
             self.settings_dialog.save_settings()
             
-            # Then update the API check if needed
             self.start_api_check(self.settings_dialog.api_url_input.text())
             
             try:
@@ -386,8 +809,8 @@ Limit response to things clearly and obviously apparent; do not guess. Do not co
         self.api_is_ready = False
         self.run_button.setEnabled(False)
         self.api_status_label.setText("API Status: Checking...")
-        self.api_status_label.setStyleSheet("color: orange")
-        
+        self.api_status_label.setStyleSheet("color: orange; padding: 4px")
+
         self.api_check_thread = APICheckThread(api_url if api_url else self.settings_dialog.api_url_input.text())
         self.api_check_thread.api_status.connect(self.update_api_status)
         self.api_check_thread.start()
@@ -396,7 +819,7 @@ Limit response to things clearly and obviously apparent; do not guess. Do not co
         if is_available:
             self.api_is_ready = True
             self.api_status_label.setText("API Status: Connected")
-            self.api_status_label.setStyleSheet("color: green")
+            self.api_status_label.setStyleSheet("color: green; padding: 4px")
             self.run_button.setEnabled(True)
             
             # Stop the check thread once we're connected
@@ -405,16 +828,146 @@ Limit response to things clearly and obviously apparent; do not guess. Do not co
         else:
             self.api_is_ready = False
             self.api_status_label.setText("API Status: Waiting for connection...")
-            self.api_status_label.setStyleSheet("color: red")
+            self.api_status_label.setStyleSheet("color: red padding: 4px")
             self.run_button.setEnabled(False)
+    
+    def update_image_preview(self, base64_image, caption, keywords, filename):
+        self.previous_image_data = base64_image
+        self.previous_caption = caption
+        self.previous_keywords = keywords
+        self.previous_filename = filename
+        
+        # Add to history
+        self.image_history.append((base64_image, caption, keywords, filename))
+        
+        # If user was viewing the most recent image (or this is the first image),
+        # update current_position to point to the new image
+        if self.current_position == -1 or len(self.image_history) <= 1:
+            self.current_position = -1  # Keep at most recent
+            self.display_image(base64_image, caption, keywords, filename)
+        else:
+            # Just update navigation buttons without changing the view
+            self.update_navigation_buttons()
             
+    def display_image(self, base64_image, caption, keywords, filename):
+        # Update the UI with the image data
+        try:
+            # Convert base64 to QImage
+            image_data = base64.b64decode(base64_image)
+            image = QImage.fromData(image_data)
+            if not image.isNull():
+                pixmap = QPixmap.fromImage(image)
+                
+                # Scale the pixmap to fit the fixed container while maintaining aspect ratio
+                scaled_pixmap = pixmap.scaled(
+                    GuiConfig.IMAGE_PREVIEW_WIDTH,
+                    GuiConfig.IMAGE_PREVIEW_HEIGHT, 
+                    Qt.AspectRatioMode.KeepAspectRatio, 
+                    Qt.TransformationMode.SmoothTransformation
+                )
+                
+                self.image_preview.setPixmap(scaled_pixmap)
+                self.image_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            else:
+                self.image_preview.setText("Error loading image")
+        except Exception as e:
+            self.image_preview.setText(f"Error: {str(e)}")
+        
+        file_basename = os.path.basename(filename)
+        self.filename_label.setText(f"Filename: {file_basename}")
+        self.caption_label.setText(caption or "No caption generated")
+        self.keywords_widget.set_keywords(keywords or [])
+        self.update_navigation_buttons()
+
+    def navigate_first(self):
+        if self.image_history:
+            self.current_position = 0
+            base64_image, caption, keywords, filename = self.image_history[0]
+            self.display_image(base64_image, caption, keywords, filename)
+
+    def navigate_prev(self):
+        if not self.image_history:
+            return
+            
+        if self.current_position == -1:
+            # If at the most recent, go to the second most recent
+            if len(self.image_history) > 1:
+                self.current_position = len(self.image_history) - 2
+                base64_image, caption, keywords, filename = self.image_history[self.current_position]
+                self.display_image(base64_image, caption, keywords, filename)
+        elif self.current_position > 0:
+            self.current_position -= 1
+            base64_image, caption, keywords, filename = self.image_history[self.current_position]
+            self.display_image(base64_image, caption, keywords, filename)
+
+    def navigate_next(self):
+        if not self.image_history:
+            return
+            
+        if self.current_position != -1 and self.current_position < len(self.image_history) - 1:
+            self.current_position += 1
+            
+            # If we've reached the end, set to -1 to indicate "most recent"
+            if self.current_position == len(self.image_history) - 1:
+                self.current_position = -1
+                
+            base64_image, caption, keywords, filename = self.image_history[
+                len(self.image_history) - 1 if self.current_position == -1 else self.current_position
+            ]
+            self.display_image(base64_image, caption, keywords, filename)
+
+    def navigate_last(self):
+        if self.image_history:
+            self.current_position = -1
+            base64_image, caption, keywords, filename = self.image_history[-1]
+            self.display_image(base64_image, caption, keywords, filename)
+
+    def update_navigation_buttons(self):
+        history_size = len(self.image_history)
+        
+        if history_size == 0:
+            # No images yet
+            self.first_button.setEnabled(False)
+            self.prev_button.setEnabled(False)
+            self.next_button.setEnabled(False)
+            self.last_button.setEnabled(False)
+            self.position_label.setText("No images processed")
+            return
+        
+        # Determine position for display
+        if self.current_position == -1:
+            # At the most recent image
+            position = history_size
+            self.next_button.setEnabled(False)
+            self.last_button.setEnabled(False)
+        else:
+            position = self.current_position + 1  # 1-based for display
+            self.next_button.setEnabled(self.current_position < history_size - 1)
+            self.last_button.setEnabled(self.current_position < history_size - 1)
+        
+        # Update position text
+        self.position_label.setText(f"Image {position} of {history_size}")
+        
+        # Enable/disable first/prev buttons
+        self.first_button.setEnabled(history_size > 1 and (self.current_position > 0 or self.current_position == -1))
+        self.prev_button.setEnabled(history_size > 1 and (self.current_position > 0 or self.current_position == -1))
+          
     def run_indexer(self):
         if not self.api_is_ready:
             QMessageBox.warning(self, "API Not Ready", 
                               "Please wait for the API to be available before running the indexer.")
             return
-            
+        
+        self.image_history = []
+        self.current_position = -1
+        self.update_navigation_buttons()
+        
         config = llmii.Config()
+        
+        self.image_preview.setText("No image processed yet")
+        self.filename_label.setText("Filename: ")
+        self.caption_label.setText("No caption generated yet")
+        self.keywords_widget.clear()
         
         # Get directory from main window
         config.directory = self.dir_input.text()
@@ -431,6 +984,16 @@ Limit response to things clearly and obviously apparent; do not guess. Do not co
         config.dry_run = self.settings_dialog.dry_run_checkbox.isChecked()
         config.skip_verify = self.settings_dialog.skip_verify_checkbox.isChecked()
         config.quick_fail = self.settings_dialog.quick_fail_checkbox.isChecked()
+        #config.normalize_keywords = self.settings_dialog.normalize_keywords_checkbox.isChecked()
+        config.normalize_keywords = True
+        config.depluralize_keywords = self.settings_dialog.depluralize_checkbox.isChecked()
+        config.limit_word_count = self.settings_dialog.word_limit_checkbox.isChecked()
+        config.max_words_per_keyword = self.settings_dialog.word_limit_spinbox.value()
+        config.split_and_entries = self.settings_dialog.split_and_checkbox.isChecked()
+        config.ban_prompt_words = self.settings_dialog.ban_prompt_words_checkbox.isChecked()
+        config.no_digits_start = self.settings_dialog.no_digits_start_checkbox.isChecked()
+        config.min_word_length = self.settings_dialog.min_word_length_checkbox.isChecked()
+        config.latin_only = self.settings_dialog.latin_only_checkbox.isChecked()
         
         # Load caption settings
         config.detailed_caption = self.settings_dialog.detailed_caption_radio.isChecked()
@@ -438,18 +1001,17 @@ Limit response to things clearly and obviously apparent; do not guess. Do not co
         config.no_caption = self.settings_dialog.no_caption_radio.isChecked()
         config.caption_instruction = self.settings_dialog.caption_instruction_input.text()
         
-        # Load instruction from main window
-        config.instruction = self.instruction_input.toPlainText()
-        
+        # Load instruction from settings
+        config.instruction = self.settings_dialog.instruction_text
         
         # Load update keywords setting
         config.update_keywords = self.settings_dialog.update_keywords_checkbox.isChecked()
         config.update_caption = self.settings_dialog.update_caption_checkbox.isChecked()
-        #config.overwrite_caption = self.settings_dialog.overwrite_caption_checkbox.isChecked()            
         config.gen_count = self.settings_dialog.gen_count.value()
              
         self.indexer_thread = IndexerThread(config)
         self.indexer_thread.output_received.connect(self.update_output)
+        self.indexer_thread.image_processed.connect(self.update_image_preview)
         self.indexer_thread.finished.connect(self.indexer_finished)
         self.pause_handler.pause_signal.connect(self.set_paused)
         self.pause_handler.stop_signal.connect(self.set_stopped)
@@ -497,6 +1059,11 @@ Limit response to things clearly and obviously apparent; do not guess. Do not co
         self.output_area.append(text)
         self.output_area.verticalScrollBar().setValue(self.output_area.verticalScrollBar().maximum())
         QApplication.processEvents()
+
+    # Override resizeEvent to disable it since we're using fixed sizes
+    def resizeEvent(self, event):
+        """We override this but it shouldn't be called since window is fixed"""
+        super().resizeEvent(event)
         
     def closeEvent(self, event):
         # Clean up API check thread when closing the window
@@ -505,8 +1072,11 @@ Limit response to things clearly and obviously apparent; do not guess. Do not co
             self.api_check_thread.wait()
         event.accept()
 
-if __name__ == "__main__":
+def main():
     app = QApplication(sys.argv)
     window = ImageIndexerGUI()
     window.show()
-    sys.exit(app.exec())
+    sys.exit(app.exec())    
+
+if __name__ == "__main__":
+    main()
