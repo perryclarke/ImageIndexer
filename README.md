@@ -1,6 +1,6 @@
 # LLMII 
 
-LLMII uses a local AI to label metadata and index images. It does not rely on a cloud services, remote APIs, or a database.
+LLMII uses a local AI to label metadata and index images. It does not rely on cloud services, remote APIs, or a database.
 
 A visual language model runs on your computer and is used to create captions and keywords for all images in a directory tree. The generated information is then added to each image file's metadata so that the images can be indexed, searched, and organized using any tool you like that can access the common metadata fields. The files themselves can be moved, renamed, copied, and edited without affecting the metadata.
 
