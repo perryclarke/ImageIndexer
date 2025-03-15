@@ -14,7 +14,7 @@ The indexer can be run on the same image files multiple times without reliance o
 Please remember to configure the settings before indexing. They are saved between runs.
 
 <div align="center">
-  <img src="./media/llmii.png" alt="Screenshot" width="704">
+  <img src="./media/Capture.PNG" alt="Screenshot" width="704">
 </div>
 
 ## Features
