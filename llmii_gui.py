@@ -521,7 +521,7 @@ class KeywordWidget(QWidget):
         row_widget = QWidget()
         row_layout = QHBoxLayout(row_widget)
         row_layout.setContentsMargins(0, 0, 0, 0)
-        row_layout.setSpacing(0)
+        row_layout.setSpacing(2)
         row_layouts.append(row_layout)
         self.keywords_layout.addWidget(row_widget)
         
@@ -717,7 +717,7 @@ class ImageIndexerGUI(QMainWindow):
         self.caption_label.setWordWrap(True)
         #self.caption_label.setFrameStyle(QFrame.Shape.NoFrame)
         self.caption_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        self.caption_label.setStyleSheet(f"background-color: {GuiConfig.COLOR_CAPTION_BG}; padding: 4px;")
+        self.caption_label.setStyleSheet(f"padding: 4px; font-weight: normal; border:none;")
         
         # Create a scroll area for caption to ensure it fits in fixed space
         caption_scroll = QScrollArea()
