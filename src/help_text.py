@@ -20,7 +20,10 @@ SETTINGS_HELP = """
 <p><b>No caption query:</b> Skip caption generation entirely, only create keywords. This option is a bit misleading because it will always generate a caption anyway, but this option will not write it to the metadata. Use this if you have captions you don't want to overwrite, but it won't make processing faster.</p>
 
 <h3>Generation Options</h3>
-<p><b>GenTokens:</b> Maximum number of tokens to generate in response. These are tokens, not words. Fewer tokens means faster processing per generation but may lead to more retries because the model may get cut off mid generation. More is not necessarily better though. Optimal range is between 100 and 250.</p>
+<p><b>GenTokens:</b> Maximum number of tokens to generate in response. These are tokens, not words. Fewer tokens means faster processing per generation but may lead to more retries because the model may get cut off mid generation. More is not necessarily better though. Optimal range is between 150 and 300.</p>
+
+<h3>Image Options</h3>
+<p><b>Dimension length:</b> The maximum length of a horizontal or vertical dimension of the image, in pixels. Setting this higher will not necessarily result in better generations. Larger image sizes can take more memory and can lead to much slower processing. It is recommended to keep this between 392 and 896.<p> 
 
 <h3>File Options</h3>
 <p><b>Don't go in subdirectories:</b> Only process images in the main directory, don't look inside others.</p>

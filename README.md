@@ -1,38 +1,33 @@
-# LLMII 
+# LLMII: Locally Label Metadata and Index Images
 
-LLMII uses a local AI to label metadata and index images. It does not rely on cloud services, remote APIs, or a database.
+LLMII uses a local AI to label metadata and index images. It does not rely on a cloud service or database.
 
-A visual language model runs on your computer and is used to create captions and keywords for all images in a directory tree. The generated information is then added to each image file's metadata so that the images can be indexed, searched, and organized using any tool you like that can access the common metadata fields. The files themselves can be moved, renamed, copied, and edited without affecting the metadata.
+A visual language model runs on your computer and is used to create captions and keywords for images in a directory tree. The generated information is then added to each image file's metadata. The images can then be indexed, searched, and organized by by their descriptions using any tool you like that can access the common metadata fields. The files themselves can be moved, renamed, copied, and edited without affecting the metadata.
 
-The indexer can be run on the same image files multiple times without reliance on a database. This enables you to:
+On your first run you will need to choose a model to run. Your system specs will be shown next to state of the art models. When you launch the indexer the model will be downloaded to the LLMII 'resources' directory. From that point the entire toolset is running completely locally.
 
-- Add new generated data using the same or different AI models for comprehensive, rich and varied metadata
-- Generate data for new files added into the image store directory without modifying images that were already processed by the tool
-- Regenerate data for data for a new purpose, using a new instruction for the AI
-- Discover files with invalid or corrupted parts so that they can be repaired or removed
-
-Please remember to configure the settings before indexing. They are saved between runs.
-
-<div align="center">
-  <img src="./media/Capture.PNG" alt="Screenshot" width="704">
-</div>
+![Screenshot](./media/python_XTvoGxM9Da.gif)
 
 ## Features
  
 - **Image Analysis**: Utilizes a local AI model to generate a list of keywords and a caption for each image
-- **Metadata Enhancement**: Can automatically add generated data to image metadata
+- **Metadata Enhancement**: Can automatically edit image metadata with generated tags
 - **Local Processing**: All processing is done locally on your machine
 - **Multi-Format Support**: Handles a wide range of image formats, including all major raw camera files
 - **User-Friendly GUI**: Includes a GUI and installer. Relies on Koboldcpp, a single executable, for all AI functionality
+- **Simple Model Selection**: Choose a the state of the art model and it will be automatically downloaded and configured
+- **Completely Automatic Backend Configuration**: The AI backend (KoboldCpp) will be downloaded and configured with optimal settings  
 - **GPU Acceleration**: Will use Apple Metal, Nvidia CUDA, or AMD (Vulkan) hardware if available to greatly speed inference
 - **Cross-Platform**: Supports Windows, macOS ARM, and Linux
 - **Stop and Start Capability**: Can stop and start without having to reprocess all the files again
 - **One or Two Step Processing**: Can do keywords and a simple caption in one step, or keywords and a detailed caption in two steps
-- **Navigation**: Step backwards and forwards through the images and view the generated data as they are processed
- 
+- **Highly Configurable**: You are in control of everything
+
 ## Important Information
 
-It is highly recommended to have a discrete graphics processor with at least 4GB of VRAM and at least 8GB of system RAM.
+It is recommended to have a discrete graphics processor in your machine.
+
+This tool verifies keywords and de-pluralizes them using rules that apply to English. Using it to generate keywords in other languages may have strange results.
 
 This tool operates directly on image file metadata. It will write to one or more of the following fields:
 
@@ -40,49 +35,54 @@ This tool operates directly on image file metadata. It will write to one or more
   2. MWG:Description
   3. XMP:Identifier
   4. XMP:Status
+  
+The "Status" and "Identifier" fields are used to track the processing state of images. The "Description" field is used for the image caption, and "Subject" or "Keyword" fields are used to hold keywords.
 
-Note that MWG is not an actual field but a direction for which actual field is to be used. This is handled by exiftool. Consult the [exiftool documentation](https://exiftool.org/TagNames/MWG.html) for information about the MWG field. 
-
+**The use of the Identifier tag means you can manage your files and add new files, and run the tool as many times as you like without worrying about reprocessing the files that were previously keyworded by the tool.**
+     
 ## Installation
 
 ### Prerequisites
 
 - Python 3.8 or higher
+- KoboldCPP
 
-The batch file or shell scripts will setup a Python environment, install the prequisites, download the model weights, and start the inference engine and the indexer. 
-
-[KoboldCpp](https://github.com/LostRuins/koboldcpp) is used as the inference engine because it is a single binary, it is multiplatform and extremely fast, and it allows automatic downloading of model weights from HuggingFace. The model used is [Qwen2-VL 2B Instruct](https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct). However, it is not necessary to use these specifically; **you can use any OpenAI compatible inference engine with any vision capable model.**
- 
+**A vision model is needed, but if you use the llmii-run.bat to open it, then the first time it is run it will download the Qwen2-VL 2B Q4_K_M gguf and F16 projector from Bartowski's repo on huggingface. If you don't want to use that, just open llmii-no-kobold.bat instead and open Koboldcpp.exe and load whatever model you like.**
   
-### Windows Quick Installation
+### Windows Installation
 
 1. Clone the repository or download the [ZIP file](https://github.com/jabberjabberjabber/llmii/archive/refs/heads/main.zip) and extract it
 
 2. Install [Python for Windows](https://www.python.org/downloads/windows/)
 
-3. Run `llmii.bat` and follow prompts
+3. Run `llmii-windows.bat`
 
-### macOS Quick Installation (including ARM)
+### macOS Installation (including ARM)
 
 1. Clone the repository or download the [ZIP file](https://github.com/jabberjabberjabber/llmii/archive/refs/heads/main.zip) and extract it
 
-2. Install Python 3.8 or higher if not already installed. You can use Homebrew:
+2. Install Python 3.7 or higher if not already installed. You can use Homebrew:
    ```
    brew install python
    ```
 
-3. Run the script:
+3. Install ExifTool:
+   ```
+   brew install exiftool
+   ```
+
+4. Run the script:
    ```
    ./llmii.sh
    ```
    
-4. If KoboldCpp fails to run, open a terminal in the LLMII folder:
+5. If KoboldCpp fails to run, open a terminal in the 'resources' folder:
    ```
-   xattr -cr koboldcpp-mac-arm64
-   chmod +x koboldcpp-mac-arm64
+   xattr -cr ./resources/koboldcpp-mac-arm64
+   chmod +x ./resources/koboldcpp-mac-arm64
    ```
 
-### Linux Quick Installation
+### Linux Installation
 
 1. Clone the repository or download and extract the ZIP file
 
@@ -92,41 +92,45 @@ The batch file or shell scripts will setup a Python environment, install the pre
    sudo apt-get install python3 python3-pip
    ```
 
+3. Install ExifTool. On Ubuntu:
+   ```
+   sudo apt-get install libimage-exiftool-perl
+   ```
+
 4. Run the script:
    ```
    ./llmii.sh
    ```
 
-5. If KoboldCpp fails to run, open a terminal in the LLMII folder:
+5. If KoboldCpp fails to run, open a terminal in the 'resources' folder:
    ```
-   chmod +x koboldcpp-linux-x64
+   chmod +x ./resources/koboldcpp-linux-x64
    ```
-
-For all platforms, the script will set up the Python environment, install dependencies, and download necessary model weights. This initial setup is performed only once and will take a few minutes depending on your download speed.
-
-### Installation Without Scripts
-
-1. Clone the repo
-
-2. Create a Python environment and install packages from requirements.txt
-
-3. Install ExifTool
-
-4. Start an inference engine and load a vision capable model
-
-5. Run llmii_gui.py using python
 
 ## Usage
 
-1. Configure the settings in the GUI
+1. Launch the LLMII GUI:
+   - On Windows: Run `llmii-windows.bat`
+   - On macOS/Linux: Run `./llmii.sh`
 
-2. Wait until you see API Connected 
+2. Ensure KoboldCPP is running. Wait until you see the following message in the KoboldCPP window:
+   ```
+   Please connect to custom endpoint at http://localhost:5001
+   ```
 
-3. Click "Run Image Indexer" to start the process
+3. Configure the indexing settings in the GUI
 
-4. Monitor the progress in the output area of the GUI.
+4. Click "Run Image Indexer" to start the process
 
-5. You can navigate through the images with the back and forward buttons
+5. Monitor the progress in the output area of the GUI.
+
+## Settings
+
+   **Press the HELP button in the settings dialog.**
+   
+## More Information and Troubleshooting
+
+Consult [the wiki](https://github.com/jabberjabberjabber/llmii/wiki) for detailed information.
 
 ## Contributing
 
@@ -139,6 +143,6 @@ This project is licensed under the GPLv3 License - see the LICENSE file for deta
 ## Acknowledgements
 
 - [ExifTool](https://exiftool.org/) for metadata manipulation
-- [KoboldCPP](https://github.com/LostRuins/koboldcpp) for local AI processing
+- [KoboldCPP](https://github.com/LostRuins/koboldcpp) for local AI processing and for the GPU information logic
 - [PyQt6](https://www.riverbankcomputing.com/software/pyqt/) for the GUI framework
 - [Fix Busted JSON](https://github.com/Qarj/fix-busted-json) and [Json Repair](https://github.com/josdejong/jsonrepair) for help with mangled JSON parsing

@@ -229,7 +229,8 @@ class Config:
         self.reprocess_all = False
         self.reprocess_orphans = True
         self.text_completion = False
-        self.gen_count = 150
+        self.gen_count = 250
+        self.res_limit = 448
         self.detailed_caption = False
         self.short_caption = True
         self.skip_verify = False
@@ -366,6 +367,7 @@ OUTPUT=```json{"Description": "Two apples next to each other, one green and one 
         parser.add_argument(
             "--normalize-keywords", action="store_true", help="Enable keyword normalization"
         )
+        parser.add_argument("--res-limit", type="int", default=448, help="Limit the resolution of the image")
         args = parser.parse_args()
 
         config = cls()
@@ -385,11 +387,11 @@ class LLMProcessor:
         self.requests = requests
         self.api_password = config.api_password
         self.max_tokens = config.gen_count
-        self.temperature = 0.6
-        self.top_p = 0.95
-        self.rep_pen = 1.1
-        self.top_k = 40
-        self.min_p = 1.02
+        self.temperature = 0.1
+        self.top_p = 1
+        self.rep_pen = 1
+        self.top_k = 0
+        self.min_p = 1.05
         
 
     def describe_content(self, task="", processed_image=None):
@@ -414,11 +416,11 @@ class LLMProcessor:
             
         try:
             messages = [
-                {"role": "system", "content": self.instruction},
+                {"role": "system", "content": self.system_instruction},
                 {
                     "role": "user", 
                     "content": [
-                        #{"type": "text", "text": instruction},
+                        {"type": "text", "text": instruction},
                         {
                             "type": "image_url",
                             "image_url": {
@@ -430,20 +432,18 @@ class LLMProcessor:
             ]
             
             payload = {
-                #"model": "gpt-4-vision-preview", 
                 "messages": messages,
                 "max_tokens": self.max_tokens,
                 "temperature": self.temperature,
                 "top_p": self.top_p,
                 "top_k": self.top_k,
+                "min_p": self.min_p
             }
             
             endpoint = f"{self.api_url}/v1/chat/completions"
-            
             headers = {
                 "Content-Type": "application/json"
             }
-            
             if self.api_password:
                 headers["Authorization"] = f"Bearer {self.api_password}"
             
@@ -457,20 +457,14 @@ class LLMProcessor:
             response_json = response.json()
             
             if "choices" in response_json and len(response_json["choices"]) > 0:
-                
                 if "message" in response_json["choices"][0]:
-                    
                     return response_json["choices"][0]["message"]["content"]
-                
                 else:
-                    
                     return response_json["choices"][0].get("text", "")
-            
             return None
             
         except Exception as e:
             print(f"Error in API call: {str(e)}")
-            
             return None
 
 class BackgroundIndexer(threading.Thread):
@@ -528,9 +522,7 @@ class FileProcessor:
         self.files_processed = 0
         self.files_completed = 0
         
-        # Multiples of 28 for Qwen-2-VL: 336, 448, 560, 672, 784, 980
-        # Pick 672 because it fits patch sizes 12, 14, 28
-        self.image_processor = ImageProcessor(max_dimension=672, patch_sizes=[12, 14, 28])
+        self.image_processor = ImageProcessor(max_dimension=self.config.res_limit, patch_sizes=[14])
         
         self.et = exiftool.ExifToolHelper(check_execute=False)
         
@@ -770,7 +762,6 @@ class FileProcessor:
                             
                             self.process_file(new_metadata)
 
-                            
                         if self.check_pause_stop():
                             return
                     
@@ -859,6 +850,9 @@ class FileProcessor:
             
             # If retry didn't work, mark failed
             if not status == "success":
+                print(f"Failed: {file_path}")
+                self.callback(f"Retry failed: {file_path}")
+                self.callback(f"---")
                 metadata["XMP:Status"] = "failed"
                 
                 if not self.config.dry_run:
