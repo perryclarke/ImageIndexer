@@ -1,2 +1,2 @@
 @echo off
-powershell "./src/launcher.ps1"
+PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& "./src/launcher.ps1"
