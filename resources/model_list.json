@@ -1,0 +1,101 @@
+[
+	{
+        "model": "Qwen2-VL 2B (6bit)",
+        "config": "qwen2-vl-2b-q6.kcpps",
+        "language_url": "https://huggingface.co/bartowski/Qwen2-VL-2B-Instruct-GGUF/blob/main/Qwen2-VL-2B-Instruct-Q6_K.gguf",
+        "mmproj_url": "https://huggingface.co/bartowski/Qwen2-VL-2B-Instruct-GGUF/blob/main/mmproj-Qwen2-VL-2B-Instruct-f16.gguf",
+        "description": "Smallest and fastest release of Qwen2-VL. Choose this if you can't fit Gemma-3 4B.",
+        "size_mb": 3120,
+        "adapter": "chatml"
+    },
+    {
+        "model": "Gemma-3 4B (6bit)",
+        "config": "gemma-3-4b-q6.kcpps",
+        "language_url": "https://huggingface.co/bartowski/google_gemma-3-4b-it-GGUF/blob/main/google_gemma-3-4b-it-Q6_K.gguf",
+        "mmproj_url": "https://huggingface.co/bartowski/google_gemma-3-4b-it-GGUF/blob/main/mmproj-google_gemma-3-4b-it-f16.gguf",
+        "description": "Gemma-3 4B is the smallest and fastest release of Gemma-3. Choose this if it fits in your VRAM.",
+        "size_mb": 4800,
+        "adapter": "gemma-2"
+    },
+    {
+        "model": "Gemma-3 4B (4bit)",
+        "config": "gemma-3-4b-q4.kcpps",
+        "language_url": "https://huggingface.co/bartowski/google_gemma-3-4b-it-GGUF/blob/main/google_gemma-3-4b-it-Q4_K_M.gguf",
+        "mmproj_url": "https://huggingface.co/bartowski/google_gemma-3-4b-it-GGUF/blob/main/mmproj-google_gemma-3-4b-it-f16.gguf",
+        "description": "This is a less precise version of Gemma-3 4B that can fit in 4GB of VRAM.",
+        "size_mb": 3800,
+        "adapter": "gemma-2"
+    },
+    {
+        "model": "Fallen Gemma-3 4B (6bit)",
+        "config": "fallen-gemma-3-4b-q6.kcpps",
+        "language_url": "https://huggingface.co/bartowski/TheDrummer_Fallen-Gemma3-4B-v1-GGUF/blob/main/TheDrummer_Fallen-Gemma3-4B-v1-Q6_K.gguf",
+        "mmproj_url": "https://huggingface.co/bartowski/google_gemma-3-4b-it-GGUF/blob/main/mmproj-google_gemma-3-4b-it-f16.gguf",
+        "description": "Uncensored fine-tune of Gemma-3 4B.",
+        "size_mb": 4800,
+        "adapter": "gemma-2"
+    },    
+    {
+        "model": "Qwen2-VL 7B (6bit)",
+        "config": "qwen2-vl-7b-q6.kcpps",
+        "language_url": "https://huggingface.co/bartowski/Qwen2-VL-7B-Instruct-GGUF/blob/main/Qwen2-VL-7B-Instruct-Q6_K.gguf",
+        "mmproj_url": "https://huggingface.co/bartowski/Qwen2-VL-7B-Instruct-GGUF/blob/main/mmproj-Qwen2-VL-7B-Instruct-f16.gguf",
+        "description": "Mid size release of Qwen2-VL.",
+        "size_mb": 9120,
+        "adapter": "chatml"
+    },
+    {
+        "model": "Qwen2-VL 7B (4bit)",
+        "config": "qwen2-vl-7b-q4.kcpps",
+        "language_url": "https://huggingface.co/bartowski/Qwen2-VL-7B-Instruct-GGUF/blob/main/Qwen2-VL-7B-Instruct-Q4_K_M.gguf",
+        "mmproj_url": "https://huggingface.co/bartowski/Qwen2-VL-7B-Instruct-GGUF/blob/main/mmproj-Qwen2-VL-7B-Instruct-f16.gguf",
+        "description": "Mid size release of Qwen2-VL meant to fit in 8GB of VRAM",
+        "size_mb": 7200,
+        "adapter": "chatml"
+    },
+    {
+        "model": "MiniCPM-V 2.6 (4 bit)",
+        "config": "minicpm-v-2_6-q4.kcpps",
+        "language_url": "https://huggingface.co/bartowski/MiniCPM-V-2_6-GGUF/blob/main/MiniCPM-V-2_6-Q4_K_M.gguf",
+        "mmproj_url": "https://huggingface.co/bartowski/MiniCPM-V-2_6-GGUF/blob/main/mmproj-MiniCPM-V-2_6-f16.gguf",
+        "description": "Very good image model based on Qwen2",
+        "size_mb": 6800,
+        "adapter": "chatml"
+    },
+    {
+        "model": "Gemma-3 12B (6bit)",
+        "config": "gemma-3-12b-q6.kcpps",
+        "language_url": "https://huggingface.co/bartowski/google_gemma-3-12b-it-GGUF/blob/main/google_gemma-3-12b-it-Q6_K.gguf",
+        "mmproj_url": "https://huggingface.co/bartowski/google_gemma-3-12b-it-GGUF/blob/main/mmproj-google_gemma-3-12b-it-f16.gguf",
+        "description": "Medium size release of Gemma-3.",
+        "size_mb": 12610,
+        "adapter": "gemma-2"
+    },
+    {
+        "model": "Gemma-3 12B (4bit)",
+        "config": "gemma-3-12b-q4.kcpps",
+        "language_url": "https://huggingface.co/bartowski/google_gemma-3-12b-it-GGUF/blob/main/google_gemma-3-12b-it-Q4_K_S.gguf",
+        "mmproj_url": "https://huggingface.co/bartowski/google_gemma-3-12b-it-GGUF/blob/main/mmproj-google_gemma-3-12b-it-f16.gguf",
+        "description": "Medium size release of Gemma-3 meant to fit in 12GB of VRAM",
+        "size_mb": 9780,
+        "adapter": "gemma-2"
+    },
+    {
+        "model": "Gemma-3 27B (4bit)",
+        "config": "gemma-3-27b-q4.kcpps",
+        "language_url": "https://huggingface.co/bartowski/google_gemma-3-27b-it-GGUF/blob/main/google_gemma-3-27b-it-Q4_K_M.gguf",
+        "mmproj_url": "https://huggingface.co/bartowski/google_gemma-3-27b-it-GGUF/blob/main/mmproj-google_gemma-3-27b-it-f16.gguf",
+        "description": "Largest size release of Google's state of the art image model.",
+        "size_mb": 20829,
+        "adapter": "gemma-2"
+    },
+    {
+        "model": "Qwen2-VL 72B (4 bit)",
+        "config": "qwen2-vl-72b-q4.kcpps",
+        "language_url": "https://huggingface.co/bartowski/Qwen2-VL-72B-Instruct-GGUF/blob/main/Qwen2-VL-72B-Instruct-Q4_K_S.gguf",
+        "mmproj_url": "https://huggingface.co/bartowski/Qwen2-VL-72B-Instruct-GGUF/blob/main/mmproj-Qwen2-VL-72B-Instruct-f16.gguf",
+        "description": "Largest size Qwen2 release.",
+        "size_mb": 55500,
+        "adapter": "chatml"
+    }    
+]
