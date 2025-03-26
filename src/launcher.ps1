@@ -10,9 +10,11 @@ function Show-Menu {
     Clear-Host
     Write-Host "================ $Title ================" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "1: " -ForegroundColor Yellow -NoNewline; Write-Host "Run Indexer with Model" -ForegroundColor Green
-    Write-Host "2: " -ForegroundColor Yellow -NoNewline; Write-Host "Run Indexer Alone" -ForegroundColor Green
-    Write-Host "3: " -ForegroundColor Yellow -NoNewline; Write-Host "Select Model" -ForegroundColor Green
+	Write-Host "1: " -ForegroundColor Yellow -NoNewline; Write-Host "Install Requirements" -ForegroundColor Green
+    Write-Host "2: " -ForegroundColor Yellow -NoNewline; Write-Host "Run Indexer with Model" -ForegroundColor Green
+    Write-Host "3: " -ForegroundColor Yellow -NoNewline; Write-Host "Run Indexer Alone" -ForegroundColor Green
+	Write-Host "4: " -ForegroundColor Yellow -NoNewline; Write-Host "Select Model" -ForegroundColor Green
+
     Write-Host "Q: " -ForegroundColor Yellow -NoNewline; Write-Host "Quit" -ForegroundColor Red
     Write-Host ""
 }
@@ -91,9 +93,11 @@ do {
     $selection = Read-Host " "
     
     switch ($selection) {
-        '1' { Run-WithAI }
-        '2' { Run-Alone }
-        '3' { Run-Setup }
+        
+        '1' { Run-Setup}
+        '2' { Run-WithAI }
+		'3' { Run-Alone }
+		'4' { Run-Setup }
         'q' { 
             Write-Host "Exiting..." -ForegroundColor Magenta
             return 
