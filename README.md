@@ -49,7 +49,7 @@ The "Status" and "Identifier" fields are used to track the processing state of i
   
 ### Windows Installation
 
-1. Clone the repository or download the [ZIP file](https://github.com/jabberjabberjabber/llmii/archive/refs/heads/main.zip) and extract it
+1. Clone the repository or download the [ZIP file](https://github.com/jabberjabberjabber/ImageIndexer/archive/refs/heads/main.zip) and extract it
 
 2. Install [Python for Windows](https://www.python.org/downloads/windows/)
 
@@ -57,7 +57,7 @@ The "Status" and "Identifier" fields are used to track the processing state of i
 
 ### macOS Installation (including ARM)
 
-1. Clone the repository or download the [ZIP file](https://github.com/jabberjabberjabber/llmii/archive/refs/heads/main.zip) and extract it
+1. Clone the repository or download the [ZIP file](https://github.com/jabberjabberjabber/ImageIndexer/archive/refs/heads/main.zip) and extract it
 
 2. Install Python 3.7 or higher if not already installed. You can use Homebrew:
    ```
@@ -128,7 +128,7 @@ The "Status" and "Identifier" fields are used to track the processing state of i
    
 ## More Information and Troubleshooting
 
-Consult [the wiki](https://github.com/jabberjabberjabber/llmii/wiki) for detailed information.
+Consult [the wiki](https://github.com/jabberjabberjabber/ImageIndexer/wiki) for detailed information.
 
 ## Contributing
 
