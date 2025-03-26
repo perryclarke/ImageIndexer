@@ -46,8 +46,6 @@ The "Status" and "Identifier" fields are used to track the processing state of i
 
 - Python 3.8 or higher
 - KoboldCPP
-
-**A vision model is needed, but if you use the llmii-run.bat to open it, then the first time it is run it will download the Qwen2-VL 2B Q4_K_M gguf and F16 projector from Bartowski's repo on huggingface. If you don't want to use that, just open llmii-no-kobold.bat instead and open Koboldcpp.exe and load whatever model you like.**
   
 ### Windows Installation
 
