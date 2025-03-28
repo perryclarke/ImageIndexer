@@ -677,9 +677,10 @@ class FileProcessor:
         return False
 
     def list_files(self, directory):
+        directory = os.path.normpath(directory)
         files = []
         for filename in os.listdir(directory):
-            file_path = os.path.join(directory, filename)
+            file_path = os.path.normpath(os.path.join(directory, filename))
             
             if os.path.isfile(file_path):
                 if self.get_file_type(os.path.splitext(filename)[1].lower()):

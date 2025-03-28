@@ -5,3 +5,4 @@ settings.json
 koboldcpp.exe
 *.txt
 /dev
+*.exe

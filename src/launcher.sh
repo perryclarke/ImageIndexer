@@ -18,9 +18,10 @@ show_menu() {
     clear
     echo -e "${CYAN}================ Indexer Launcher ================${NC}"
     echo ""
-    echo -e "${YELLOW}1:${NC} ${GREEN}Run Indexer with Model${NC}"
-    echo -e "${YELLOW}2:${NC} ${GREEN}Run Indexer Alone${NC}"
-    echo -e "${YELLOW}3:${NC} ${GREEN}Select Model${NC}"
+    echo -e "${YELLOW}1:${NC} ${GREEN}Install Requirements${NC}"
+    echo -e "${YELLOW}2:${NC} ${GREEN}Run Indexer with Model${NC}"
+    echo -e "${YELLOW}3:${NC} ${GREEN}Run Indexer Alone${NC}"
+    echo -e "${YELLOW}4:${NC} ${GREEN}Select Model${NC}"
     echo -e "${YELLOW}Q:${NC} ${RED}Quit${NC}"
     echo ""
 }
@@ -91,9 +92,10 @@ while [ "$selection" != "q" ]; do
     read selection
     
     case $selection in
-        1) run_with_ai ;;
-        2) run_alone ;;
-        3) run_setup ;;
+        1) run_setup ;;
+		2) run_with_ai ;;
+        3) run_alone ;;
+        4) run_setup ;;
         q|Q) 
             echo -e "${MAGENTA}Exiting...${NC}"
             exit 0

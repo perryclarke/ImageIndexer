@@ -70,7 +70,7 @@ class ImageProcessor:
                 return file_type
         return None
     
-    def _calculate_dimensions(self, width: int, height: int) -> Tuple[int, int]:
+    def _calculate_dimensions(self, width, height):
         """ Calculate dimensions maintaining aspect ratio and patch compatibility 
         """
         scale = min(self.max_dimension / width, self.max_dimension / height)
@@ -83,7 +83,7 @@ class ImageProcessor:
         
         return new_width, new_height
 
-    def _resize_image(self, img: Image.Image) -> Image.Image:
+    def _resize_image(self, img):
         """ Resize image ensuring patch compatibility
         """
         new_width, new_height = self._calculate_dimensions(*img.size)
@@ -91,10 +91,10 @@ class ImageProcessor:
             return img.resize((new_width, new_height), Image.Resampling.BICUBIC)
         return img
 
-    def process_raw_image(self, file_path: Union[str, Path]) -> str:
+    def process_raw_image(self, file_path):
         """ Process RAW image files
         """
-        with rawpy.imread(str(file_path)) as raw:
+        with rawpy.imread(file_path) as raw:
             try:
                 # Try to extract embedded JPEG thumbnail first
                 thumb = raw.extract_thumb()
@@ -114,7 +114,7 @@ class ImageProcessor:
             resized.save(buffer, format="JPEG", quality=95)
             return base64.b64encode(buffer.getvalue()).decode()
             
-    def route_image(self, file_path: Union[str, Path]) -> Optional[str]:
+    def route_image(self, file_path):
         """ Process image """
         if os.path.getsize(file_path) > self.max_file_size:
             raise ValueError(f"File exceeds size limit of {self.max_file_size} bytes")
@@ -145,12 +145,13 @@ class ImageProcessor:
             
         return None
         
-    def process_image(self, image_path):    
+    def process_image(self, file_path):    
         """ Process an image through the LLM
         """
-        encoded = self.route_image(image_path)
+        file_path = os.path.normpath(file_path)
+        encoded = self.route_image(file_path)
         
         if not encoded:
-            return None, Path(image_path)
+            return None, file_path
 
-        return encoded, Path(image_path)
+        return encoded, file_path
