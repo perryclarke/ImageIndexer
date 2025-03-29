@@ -6,3 +6,4 @@ koboldcpp.exe
 *.txt
 /dev
 *.exe
+resources/kobold_args.json

@@ -237,6 +237,7 @@ class Config:
         self.quick_fail = False
         self.no_caption = False
         self.update_caption = False
+        self.use_sidecar = False
         self.normalize_keywords = True
         self.depluralize_keywords = True
         self.limit_word_count = True
@@ -346,6 +347,9 @@ OUTPUT=```json{"Description": "Two apples next to each other, one green and one 
         )
         parser.add_argument(
             "--reprocess-failed", action="store_true", help="Reprocess failed files"
+        )
+        parser.add_argument(
+            "--use-sidecar", action="store_true", help="Store generated data in an xmp sidecare instead of the image file"
         )
         parser.add_argument(
             "--reprocess-orphans", action="store_true", help="If a file has a UUID, determine its status"
@@ -731,6 +735,13 @@ class FileProcessor:
                             
                             # Make a copy with only the fields we want to write
                             new_metadata = {}
+                            
+                            # Check if we actually have a sidecar in the path
+                            if self.config.use_sidecar and metadata["SourceFile"].lower().endswith(".xmp"):
+                                
+                                # Remove the xmp so we reference the image
+                                metadata["SourceFile"] = os.path.splitext(metadata["SourceFile"])[0]
+                                  
                             new_metadata["SourceFile"] = metadata.get("SourceFile")
                             
                             for key, value in metadata.items():
@@ -791,6 +802,19 @@ class FileProcessor:
             else:
                 params = ["-validate"]   
             
+            # Use sidecars if they exist for metadata instead of images because
+            # that is where we will have put the UUID and Status info
+            if self.config.use_sidecar:
+                xmp_files = []
+                for file in files:
+                    
+                    # Check for files named file.ext.xmp for sidecar
+                    if os.path.exists(file + ".xmp"):
+                       xmp_files.append(file  + ".xmp")
+
+                    else:
+                        xmp_files.append(file)
+                files = xmp_files
             return self.et.get_tags(files, tags=exiftool_fields, params=params)
             
         except Exception as e:
@@ -814,8 +838,12 @@ class FileProcessor:
             This minimizes the number of writes to the file.
         """
         try:    
+            
+            
             file_path = metadata["SourceFile"]
             
+
+                
             # If the file doesn't exist anymore, skip it
             if not os.path.exists(file_path):
                 self.callback(f"File no longer exists: {file_path}")
@@ -1007,12 +1035,14 @@ class FileProcessor:
             print("Dry run. Not writing.")
             
             return True
-        
+
         try:
             params = ["-P"]
             
-            if self.config.no_backup:
+            if self.config.no_backup or self.config.use_sidecar:
                 params.append("-overwrite_original")
+            if self.config.use_sidecar:
+                file_path = file_path + ".xmp"
                 
             # Use existing ExifTool instance
             self.et.set_tags(file_path, tags=metadata, params=params)

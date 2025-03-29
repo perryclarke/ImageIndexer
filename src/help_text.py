@@ -34,6 +34,7 @@ SETTINGS_HELP = """
 <p><b>Pretend mode:</b> Simulate processing without making any changes. This allows you to see what metadata would be generated without writing to any files.</p>
 <p><b>No file validation:</b> Skip verifying file content. If you are seeing a lot of valid files being skipped as invalid, check this. Otherwise leave it alone.</p>
 <p><b>No retries:</b> Don't retry failed API requests. This is when you don't want to bother trying a second time if you get a parse error from the AI. It is recommended to leave this disabled.</p>
+<p><b>Use metadata sidecar instead of writing to image:</b> If you do not want to write anything to the image files themselves, for instance if you have hashed the files and they cannot change, you can instead write the metadata to an xmp file with the same name as the image file but with an xmp extension added. This xmp file will contain the metadata.</p>
 
 <h3>Existing Metadata</h3>
 <p><b>Don't clear existing keywords:</b> Keep existing keywords and add new ones. This adds the generated keywords to whatever keywords already exist in the image metadata. Very useful if you want to run the tool again on pictures with a different AI model and get some new keywords. Any existing keywords will be also processed according to the keyword corrections options below and deduplicated when combined with the new ones.</p>

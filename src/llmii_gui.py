@@ -237,7 +237,7 @@ class SettingsDialog(QDialog):
         self.dry_run_checkbox = QCheckBox("Pretend mode")
         self.skip_verify_checkbox = QCheckBox("No file validation")
         self.quick_fail_checkbox = QCheckBox("No retries")
-        
+        self.use_sidecar_checkbox = QCheckBox("Use metadata sidecar file instead of writing to image") 
         options_layout.addWidget(self.no_crawl_checkbox)
         options_layout.addWidget(self.reprocess_all_checkbox)
         options_layout.addWidget(self.reprocess_failed_checkbox)
@@ -246,6 +246,7 @@ class SettingsDialog(QDialog):
         options_layout.addWidget(self.dry_run_checkbox)
         options_layout.addWidget(self.skip_verify_checkbox)
         options_layout.addWidget(self.quick_fail_checkbox)
+        options_layout.addWidget(self.use_sidecar_checkbox)
         
         options_group.setLayout(options_layout)
         scroll_layout.addWidget(options_group)
@@ -353,6 +354,7 @@ class SettingsDialog(QDialog):
                 self.dry_run_checkbox.setChecked(settings.get('dry_run', False))
                 self.skip_verify_checkbox.setChecked(settings.get('skip_verify', False))
                 self.quick_fail_checkbox.setChecked(settings.get('quick_fail', False))
+                self.use_sidecar_checkbox.setChecked(settings.get('use_sidecar', False))
                 self.caption_instruction_input.setText(settings.get('caption_instruction', 'Describe the image in detail. Be specific.'))
                 
                 # Set radio button based on settings
@@ -402,6 +404,7 @@ class SettingsDialog(QDialog):
             'short_caption': self.short_caption_radio.isChecked(),
             'no_caption': self.no_caption_radio.isChecked(),
             'update_caption': self.update_caption_checkbox.isChecked(),
+            'use_sidecar': self.use_sidecar_checkbox.isChecked(),
             'depluralize_keywords': self.depluralize_checkbox.isChecked(),
             'limit_word_count': self.word_limit_checkbox.isChecked(),
             'max_words_per_keyword': self.word_limit_spinbox.value(),
@@ -997,6 +1000,7 @@ class ImageIndexerGUI(QMainWindow):
         config.dry_run = self.settings_dialog.dry_run_checkbox.isChecked()
         config.skip_verify = self.settings_dialog.skip_verify_checkbox.isChecked()
         config.quick_fail = self.settings_dialog.quick_fail_checkbox.isChecked()
+        config.use_sidecar = self.settings_dialog.use_sidecar_checkbox.isChecked()
         config.normalize_keywords = True
         config.depluralize_keywords = self.settings_dialog.depluralize_checkbox.isChecked()
         config.limit_word_count = self.settings_dialog.word_limit_checkbox.isChecked()
