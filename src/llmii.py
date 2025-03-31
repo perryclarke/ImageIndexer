@@ -371,7 +371,7 @@ OUTPUT=```json{"Description": "Two apples next to each other, one green and one 
         parser.add_argument(
             "--normalize-keywords", action="store_true", help="Enable keyword normalization"
         )
-        parser.add_argument("--res-limit", type="int", default=448, help="Limit the resolution of the image")
+        parser.add_argument("--res-limit", type=int, default=448, help="Limit the resolution of the image")
         args = parser.parse_args()
 
         config = cls()
