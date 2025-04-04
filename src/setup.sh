@@ -86,7 +86,7 @@ fi
 
 clear
 
-python3 -m src.llmii_setup
+python3 -m src.llmii_setup --update
 
 deactivate
 

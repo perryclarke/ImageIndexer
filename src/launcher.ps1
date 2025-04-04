@@ -86,6 +86,16 @@ function Run-Setup {
     }
 }
 
+function Run-Model {
+    try {
+        Write-Host "Model selection starting..." -ForegroundColor Blue
+        start-process -wait "src\select_model.bat"
+ 
+    } catch {
+        Write-Host "Error running model selection: $_" -ForegroundColor Red
+        Read-Host "Press Enter to continue..." | Out-Null
+    }
+}
 $selection = ""
 do {
     Show-Menu
@@ -97,7 +107,7 @@ do {
         '1' { Run-Setup}
         '2' { Run-WithAI }
 		'3' { Run-Alone }
-		'4' { Run-Setup }
+		'4' { Run-Model }
         'q' { 
             Write-Host "Exiting..." -ForegroundColor Magenta
             return 

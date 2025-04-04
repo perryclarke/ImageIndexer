@@ -15,7 +15,7 @@
         "mmproj_url": "https://huggingface.co/bartowski/google_gemma-3-4b-it-GGUF/blob/main/mmproj-google_gemma-3-4b-it-f16.gguf",
         "description": "Gemma-3 4B is the smallest and fastest release of Gemma-3. Choose this if it fits in your VRAM.",
         "size_mb": 4800,
-        "adapter": "gemma-2"
+        "adapter": "gemma-3"
     },
     {
         "model": "Gemma-3 4B (4bit)",
@@ -24,16 +24,16 @@
         "mmproj_url": "https://huggingface.co/bartowski/google_gemma-3-4b-it-GGUF/blob/main/mmproj-google_gemma-3-4b-it-f16.gguf",
         "description": "This is a less precise version of Gemma-3 4B that can fit in 4GB of VRAM.",
         "size_mb": 3800,
-        "adapter": "gemma-2"
+        "adapter": "gemma-3"
     },
     {
-        "model": "Fallen Gemma-3 4B (6bit)",
-        "config": "fallen-gemma-3-4b-q6.kcpps",
-        "language_url": "https://huggingface.co/bartowski/TheDrummer_Fallen-Gemma3-4B-v1-GGUF/blob/main/TheDrummer_Fallen-Gemma3-4B-v1-Q6_K.gguf",
-        "mmproj_url": "https://huggingface.co/bartowski/google_gemma-3-4b-it-GGUF/blob/main/mmproj-google_gemma-3-4b-it-f16.gguf",
-        "description": "Uncensored fine-tune of Gemma-3 4B.",
+        "model": "X-Ray_Alpha (6bit)",
+        "config": "x-ray-alpha-4b-q6.kcpps",
+        "language_url": "https://huggingface.co/bartowski/SicariusSicariiStuff_X-Ray_Alpha-GGUF/blob/main/SicariusSicariiStuff_X-Ray_Alpha-Q6_K.gguf",
+        "mmproj_url": "https://huggingface.co/bartowski/SicariusSicariiStuff_X-Ray_Alpha-GGUF/blob/main/mmproj-SicariusSicariiStuff_X-Ray_Alpha-f16.gguf",
+        "description": "Uncensored fine-tune of Gemma-3 4B. Currently in experimental Alpha.",
         "size_mb": 4800,
-        "adapter": "gemma-2"
+        "adapter": "gemma-3"
     },    
     {
         "model": "Qwen2-VL 7B (6bit)",
@@ -69,7 +69,7 @@
         "mmproj_url": "https://huggingface.co/bartowski/google_gemma-3-12b-it-GGUF/blob/main/mmproj-google_gemma-3-12b-it-f16.gguf",
         "description": "Medium size release of Gemma-3.",
         "size_mb": 12610,
-        "adapter": "gemma-2"
+        "adapter": "gemma-3"
     },
     {
         "model": "Gemma-3 12B (4bit)",
@@ -78,7 +78,7 @@
         "mmproj_url": "https://huggingface.co/bartowski/google_gemma-3-12b-it-GGUF/blob/main/mmproj-google_gemma-3-12b-it-f16.gguf",
         "description": "Medium size release of Gemma-3 meant to fit in 12GB of VRAM",
         "size_mb": 9780,
-        "adapter": "gemma-2"
+        "adapter": "gemma-3"
     },
     {
         "model": "Gemma-3 27B (4bit)",
@@ -87,7 +87,7 @@
         "mmproj_url": "https://huggingface.co/bartowski/google_gemma-3-27b-it-GGUF/blob/main/mmproj-google_gemma-3-27b-it-f16.gguf",
         "description": "Largest size release of Google's state of the art image model.",
         "size_mb": 20829,
-        "adapter": "gemma-2"
+        "adapter": "gemma-3"
     },
     {
         "model": "Qwen2-VL 72B (4 bit)",

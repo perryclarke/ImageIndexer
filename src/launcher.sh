@@ -84,7 +84,13 @@ run_setup() {
     
     bash "$SCRIPT_DIR/src/setup.sh"
 }
-
+run_model() {
+    echo -e "${BLUE}Model selection starting...${NC}"
+    
+    chmod +x "$SCRIPT_DIR/src/select_model.sh"
+    
+    bash "$SCRIPT_DIR/src/select_model.sh"
+}
 selection=""
 while [ "$selection" != "q" ]; do
     show_menu
@@ -95,7 +101,7 @@ while [ "$selection" != "q" ]; do
         1) run_setup ;;
 		2) run_with_ai ;;
         3) run_alone ;;
-        4) run_setup ;;
+        4) run_model ;;
         q|Q) 
             echo -e "${MAGENTA}Exiting...${NC}"
             exit 0

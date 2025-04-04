@@ -67,7 +67,7 @@ echo **              THIS IS NOT AN ERROR                **
 echo **        CLOSE THIS WINDOW WHEN YOU ARE DONE       **
 echo ******************************************************
 echo.
-python -m src.llmii_setup
+python -m src.llmii_setup --update
 
 deactivate
 exit /b 1

@@ -273,7 +273,7 @@ def get_kobold_version(executable_path):
         version_output = result.stdout.strip()
         print (version_output)
         # Extract version number
-        version_match = re.search(r'(\d+\.\d+\.\d+)', version_output)
+        version_match = re.search(r'(\d+(?:\.\d+)*)', version_output)
         if version_match:
             return version_match.group(1)
     except Exception as e:
@@ -321,7 +321,7 @@ def determine_kobold_filename(gpu_summary):
         if platform.machine() == "arm64":
             return "koboldcpp-mac-arm64"
         else:
-            return "koboldcpp-mac-x64"
+            return None
     
     elif system == "Linux":
         if cuda_available:
@@ -336,7 +336,7 @@ def determine_kobold_filename(gpu_summary):
     else:
         raise ValueError(f"Unsupported operating system: {system}")
 
-def manage_kobold_executable(gpu_summary):
+def manage_kobold_executable():
     """
     Manages the Kobold executable by checking for updates and downloading if needed.
     
@@ -364,15 +364,21 @@ def manage_kobold_executable(gpu_summary):
             if match:
                 executable_version = match.group(1).replace('_', '.')
             break
+    #gpu_summary["existing_executable"] = existing_executable
+    #gpu_summary["executable_version"] = executable_version
+    return existing_executable
     
     # If we found both and the versions match, use the existing executable
-    if current_version and executable_version and current_version == executable_version:
-        print(f"Using existing Kobold executable version {current_version}")
-        return existing_executable
-    
+    #if current_version and executable_version and current_version == executable_version:
+        #print(f"Using existing Kobold executable version {current_version}")
+        #return existing_executable
+    #    pass
     # Otherwise download the latest version
-    base_url = "https://github.com/LostRuins/koboldcpp/releases/latest/download/"
     
+def download_kobold(gpu_summary, existing_executable):
+    print("Checking for KoboldCpp update...")
+    base_url = "https://github.com/LostRuins/koboldcpp/releases/latest/download/"
+    version_file = os.path.join(RESOURCES_DIR, "version.txt")
     # Determine which file to download
     download_filename = determine_kobold_filename(gpu_summary)
     download_url = base_url + download_filename
@@ -380,7 +386,6 @@ def manage_kobold_executable(gpu_summary):
     # Set local filename for downloaded file
     extension = '.exe' if download_filename.endswith('.exe') else ''
     temp_download_path = os.path.join(RESOURCES_DIR, download_filename)
-    
     if download_file(download_url, temp_download_path):
         version = get_kobold_version(temp_download_path)
         if version:
@@ -617,7 +622,7 @@ class SetupApp:
         
         self.app.setPalette(palette)
     
-    def run_setup(self):
+    def run_setup(self, update=True):
         """Run setup and detection process with progress dialog"""
         progress_dialog = ProgressDialog()
         progress_dialog.show()
@@ -634,10 +639,15 @@ class SetupApp:
                 50
             )
         
-        progress_dialog.update_progress("Getting KoboldCPP executable...", 60)
-        executable_path = manage_kobold_executable(gpu_summary)
+        existing_executable = manage_kobold_executable()
         
-        gpu_summary["executable_path"] = executable_path
+        if update:
+            progress_dialog.update_progress("Getting KoboldCPP executable...", 60)
+            gpu_summary["executable_path"] = download_kobold(gpu_summary, existing_executable)
+        
+        else:
+            gpu_summary["executable_path"] = existing_executable
+        
         progress_dialog.update_progress("Setup completed successfully", 100)
         
         QApplication.processEvents()
@@ -691,10 +701,11 @@ class SetupApp:
             QMessageBox.critical(None, "Error", f"Failed: {e}")
             return False
    
-    def run(self):
+    def run(self, update=False):
         """Run the entire setup process"""
         try:
-            gpu_summary = self.run_setup()
+            
+            gpu_summary = self.run_setup(update)
             
             selected_model = self.show_model_selection(gpu_summary)
             if not selected_model:
@@ -714,12 +725,16 @@ class SetupApp:
             return 1
 
 
-def setup():
+def setup(update=False):
     setup = SetupApp()
-    return setup.run()
+    return setup.run(update)
     
 def main():
-    setup()
+    import argparse
+    parser = argparse.ArgumentParser(description="Setup Utility for LLMII")
+    parser.add_argument("--update", action="store_true", help="Install or Update KoboldCpp executable")
+    args = parser.parse_args()
+    setup(args.update)
     sys.exit()
 
 if __name__ == "__main__":
