@@ -36,13 +36,15 @@ run_with_ai() {
             MMPROJ=$(jq -r '.mmproj' "$KOBOLD_ARGS_PATH")
             CONTEXTSIZE=$(jq -r '.contextsize' "$KOBOLD_ARGS_PATH")
             VISIONMAXRES=$(jq -r '.visionmaxres' "$KOBOLD_ARGS_PATH")
+			CHATCOMPLETIONSADAPTER=$(jq -r '.chatcompletionsadapter' "$KOBOLD_ARGS_PATH")
         else
             EXECUTABLE=$(python3 -c "import json; print(json.load(open('$KOBOLD_ARGS_PATH'))['executable'])")
             MODEL_PARAM=$(python3 -c "import json; print(json.load(open('$KOBOLD_ARGS_PATH'))['model_param'])")
             MMPROJ=$(python3 -c "import json; print(json.load(open('$KOBOLD_ARGS_PATH'))['mmproj'])")
             CONTEXTSIZE=$(python3 -c "import json; print(json.load(open('$KOBOLD_ARGS_PATH'))['contextsize'])")
             VISIONMAXRES=$(python3 -c "import json; print(json.load(open('$KOBOLD_ARGS_PATH'))['visionmaxres'])")
-        fi
+			CHATCOMPLETIONSADAPTER=$(python3 -c "import json; print(json.load(open('$KOBOLD_ARGS_PATH'))['chatcompletionsadapter'])")
+		fi
         
         EXECUTABLE_PATH="$RESOURCES_DIR/$EXECUTABLE"
         
@@ -55,7 +57,7 @@ run_with_ai() {
         chmod +x "$EXECUTABLE_PATH"
         
         # Start the process in the background
-        (cd "$WORKING_DIR" && "$EXECUTABLE_PATH" "$MODEL_PARAM" --mmproj "$MMPROJ" --contextsize "$CONTEXTSIZE" --visionmaxres "$VISIONMAXRES" --flashattention) &
+        (cd "$WORKING_DIR" && "$EXECUTABLE_PATH" "$MODEL_PARAM" --mmproj "$MMPROJ" --contextsize "$CONTEXTSIZE" --visionmaxres "$VISIONMAXRES" --chatcompletionsadapter "$CHATCOMPLETIONSADAPTER" --flashattention) &
         
         run_gui
     else

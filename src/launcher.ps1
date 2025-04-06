@@ -31,7 +31,8 @@ function Run-WithAI {
                 "--mmproj", $koboldArgs.mmproj,
                 "--contextsize", $koboldArgs.contextsize,
                 "--visionmaxres", $koboldArgs.visionmaxres,
-                "--flashattention"
+                "--flashattention",
+				"--chatcompletionsadapter", $koboldArgs.chatcompletionsadapter
             )
             
             Write-Host "Starting Indexer with AI support..." -ForegroundColor Green
