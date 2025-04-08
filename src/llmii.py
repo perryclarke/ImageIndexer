@@ -492,17 +492,25 @@ class BackgroundIndexer(threading.Thread):
 
     def _index_directory(self, directory):
         files = []
+        directory = os.path.normpath(directory)
         
         for filename in os.listdir(directory):
-            file_path = os.path.join(directory, filename)
-            
-            if os.path.isfile(file_path) and any(file_path.lower().endswith(ext) for ext in self.file_extensions):
-                files.append(file_path)
-        
+            file_path = os.path.normpath(os.path.join(directory, filename))
+            if not any(file_path.lower().endswith(ext) for ext in self.file_extensions):
+                continue
+                    
+            try:
+                # Check for 0 byte files
+                size = os.path.getsize(file_path)
+                if size > 0:
+                    files.append(file_path)
+            except (FileNotFoundError, PermissionError, OSError):
+                continue
+                
         if files:
             self.total_files_found += len(files)
             self.metadata_queue.put((directory, files))
-
+            
 class FileProcessor:
     def __init__(self, config, check_paused_or_stopped=None, callback=None):
         self.config = config
@@ -528,7 +536,7 @@ class FileProcessor:
         
         self.image_processor = ImageProcessor(max_dimension=self.config.res_limit, patch_sizes=[14])
         
-        self.et = exiftool.ExifToolHelper(check_execute=False)
+        self.et = exiftool.ExifToolHelper(encoding='utf-8')
         
         # Words in the prompt tend to get repeated back by certain models
         self.banned_words = ["no", "unspecified", "unknown", "standard", "unidentified", "time", "category", "actions", "setting", "objects", "visual", "elements", "activities", "appearance", "professions", "relationships", "identify", "photography", "photographic", "topiary"]
@@ -679,24 +687,6 @@ class FileProcessor:
                 return True
         
         return False
-
-    def list_files(self, directory):
-        directory = os.path.normpath(directory)
-        files = []
-        for filename in os.listdir(directory):
-            file_path = os.path.normpath(os.path.join(directory, filename))
-            
-            if os.path.isfile(file_path):
-                if self.get_file_type(os.path.splitext(filename)[1].lower()):
-                    files.append(file_path)
-        
-        if files:
-            self.files_in_queue += len(files)
-            self.callback(
-                f"Added folder {directory} to queue containing {len(files)} image files."
-            )
-        
-        return files
                 
     def process_directory(self, directory):
         try:

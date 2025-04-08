@@ -122,6 +122,17 @@ The "Status" and "Identifier" fields are used to track the processing state of i
 
 5. Monitor the progress in the output area of the GUI.
 
+## Languages
+
+It is sometimes possible to get keywords or captions in a language besides English. You will need to modify the instruction and uncheck some keyword options. To do this:
+
+1. In the GUI, click on "Settings" and then "Edit Instructions":
+   - Replace ENGLISH in the instructions with the name of a different language
+
+2. In Keyword Corrections:
+   - Uncheck "Depluralize keywords"
+   - Uncheck "Only Latin characters"
+
 ## Settings
 
    **Press the HELP button in the settings dialog.**
