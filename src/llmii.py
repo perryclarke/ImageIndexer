@@ -472,7 +472,7 @@ class LLMProcessor:
             return None
 
 class BackgroundIndexer(threading.Thread):
-    def __init__(self, root_dir, metadata_queue, file_extensions, no_crawl=False):
+    def __init__(self, root_dir, metadata_queue, file_extensions, no_crawl=False, chunk_size=100):
         threading.Thread.__init__(self)
         self.root_dir = root_dir
         self.metadata_queue = metadata_queue
@@ -480,52 +480,105 @@ class BackgroundIndexer(threading.Thread):
         self.no_crawl = no_crawl
         self.total_files_found = 0
         self.indexing_complete = False
+        self.chunk_size = chunk_size
+        self.checkpoint_path = os.path.join(root_dir, ".llmii_checkpoint")
+        self.last_processed_dir = self._load_checkpoint()
         
+    def _load_checkpoint(self):
+        """Load directory checkpoint if it exists"""
+        if os.path.exists(self.checkpoint_path):
+            try:
+                with open(self.checkpoint_path, 'r') as f:
+                    return f.read().strip()
+            except:
+                return None
+        return None
+        
+    def _save_checkpoint(self, directory):
+        """Save current directory as checkpoint"""
+        try:
+            with open(self.checkpoint_path, 'w') as f:
+                f.write(directory)
+        except:
+            pass
+            
     def run(self):
         if self.no_crawl:
             self._index_directory(self.root_dir)
-        
         else:
+            # Get ordered list of directories to process
+            directories = []
             for root, _, _ in os.walk(self.root_dir):
-                self._index_directory(root)
+                directories.append(os.path.normpath(root))
+            
+            directories.sort()
+            
+            # Skip to last processed directory if resuming
+            start_idx = 0
+            if self.last_processed_dir:
+                try:
+                    start_idx = directories.index(self.last_processed_dir) + 1
+                    # If already completed the last directory, just start from beginning
+                    if start_idx >= len(directories):
+                        start_idx = 0
+                except ValueError:
+                    start_idx = 0
+                    
+            for i in range(start_idx, len(directories)):
+                self._index_directory(directories[i])
+                self._save_checkpoint(directories[i])
+                
         self.indexing_complete = True
 
     def _index_directory(self, directory):
-        files = []
+        """Process directory in chunks"""
         directory = os.path.normpath(directory)
+        file_batch = []
         
-        for filename in os.listdir(directory):
-            file_path = os.path.normpath(os.path.join(directory, filename))
-            if not any(file_path.lower().endswith(ext) for ext in self.file_extensions):
-                continue
-                    
-            try:
-                # Check for 0 byte files
-                size = os.path.getsize(file_path)
-                if size > 0:
-                    files.append(file_path)
-            except (FileNotFoundError, PermissionError, OSError):
-                continue
+        try:
+            for filename in os.listdir(directory):
+                file_path = os.path.normpath(os.path.join(directory, filename))
                 
-        if files:
-            self.total_files_found += len(files)
-            self.metadata_queue.put((directory, files))
-            
+                # Skip if not a valid file type
+                if not any(file_path.lower().endswith(ext) for ext in self.file_extensions):
+                    continue
+                        
+                try:
+                    # Check for 0 byte files
+                    size = os.path.getsize(file_path)
+                    if size > 0:
+                        file_batch.append(file_path)
+                        
+                        # When we reach chunk size, send batch to queue
+                        if len(file_batch) >= self.chunk_size:
+                            self.total_files_found += len(file_batch)
+                            self.metadata_queue.put((directory, file_batch))
+                            file_batch = []
+                            
+                except (FileNotFoundError, PermissionError, OSError):
+                    continue
+                    
+            # Don't forget the last batch
+            if file_batch:
+                self.total_files_found += len(file_batch)
+                self.metadata_queue.put((directory, file_batch))
+                
+        except (PermissionError, OSError):
+            print(f"Permission denied or error accessing directory: {directory}")
+
+
 class FileProcessor:
     def __init__(self, config, check_paused_or_stopped=None, callback=None):
         self.config = config
         self.llm_processor = LLMProcessor(config)
         
         if check_paused_or_stopped is None:
-
             self.check_paused_or_stopped = lambda: False
-        
         else:
             self.check_paused_or_stopped = check_paused_or_stopped
             
         if callback is None:
             self.callback = print
-        
         else:
             self.callback = callback
         
@@ -541,8 +594,6 @@ class FileProcessor:
         # Words in the prompt tend to get repeated back by certain models
         self.banned_words = ["no", "unspecified", "unknown", "standard", "unidentified", "time", "category", "actions", "setting", "objects", "visual", "elements", "activities", "appearance", "professions", "relationships", "identify", "photography", "photographic", "topiary"]
                 
-        # These are the fields we check. ExifTool returns are kind of strange, not always
-        # conforming to where they are or what they actually are named. These should find all of them
         self.keyword_fields = [
             "Keywords",
             "IPTC:Keywords",
@@ -578,15 +629,146 @@ class FileProcessor:
         
         self.image_extensions = config.image_extensions
         self.metadata_queue = queue.Queue()
+
+        chunk_size = getattr(config, 'chunk_size', 100)
         
         self.indexer = BackgroundIndexer(
             config.directory, 
             self.metadata_queue, 
             [ext for exts in self.image_extensions.values() for ext in exts], 
-            config.no_crawl
+            config.no_crawl,
+            chunk_size=chunk_size
         )
         
+        self.file_checkpoint_path = os.path.join(config.directory, ".llmii_file_checkpoint")
+        self.last_processed_file = self._load_file_checkpoint()
+        
         self.indexer.start()
+        
+    def _load_file_checkpoint(self):
+        """Load file processing checkpoint if it exists"""
+        if os.path.exists(self.file_checkpoint_path):
+            try:
+                with open(self.file_checkpoint_path, 'r') as f:
+                    return f.read().strip()
+            except:
+                return None
+        return None
+        
+    def _save_file_checkpoint(self, file_path):
+        """Save current file as checkpoint"""
+        try:
+            with open(self.file_checkpoint_path, 'w') as f:
+                f.write(file_path)
+        except:
+            pass
+    
+    def process_directory(self, directory):
+        try:
+            while not (self.indexer.indexing_complete and self.metadata_queue.empty()):
+                if self.check_pause_stop():
+                    return
+                
+                try:
+                    directory, files = self.metadata_queue.get(timeout=1)
+                    self.callback(f"Processing directory: {directory}")
+                    self.callback(f"---")
+                    
+                    # If we have a last processed file checkpoint, find where to resume
+                    if self.last_processed_file:
+                        try:
+                            resume_idx = files.index(self.last_processed_file) + 1
+                            # Only skip if we haven't processed the entire directory yet
+                            if resume_idx < len(files):
+                                self.callback(f"Resuming from file: {self.last_processed_file}")
+                                files = files[resume_idx:]
+                            self.last_processed_file = None  # Reset after finding
+                        except ValueError:
+                            # File not in this batch, process normally
+                            pass
+                    
+                    batch_size = 50 
+                    for i in range(0, len(files), batch_size):
+                        batch = files[i:i+batch_size]
+                        metadata_list = self._get_metadata_batch(batch)
+                        
+                        for metadata in metadata_list:
+                            if metadata:
+                                if not self.config.skip_verify:
+                                    # Check ExifTool validation
+                                    if "ExifTool:Validate" in metadata:
+                                        errors, warnings, minor = map(int, metadata.get("ExifTool:Validate", "0 0 0").split())
+                                        source_file = metadata.get("SourceFile")
+                                        
+                                        if errors > 0:
+                                            print(f"{source_file}: failed to validate. Skipping!")
+                                            self.callback(f"\n{source_file}: failed to validate. Skipping!")
+                                            self.callback(f"---")
+                                            self.files_processed +=1
+                                            continue
+                                                       
+                                # Process metadata
+                                keywords = []
+                                status = None
+                                identifier = None
+                                caption = None
+                                
+                                # Make a copy with only the fields we want to write
+                                new_metadata = {}
+                                
+                                # Check if we actually have a sidecar in the path
+                                if self.config.use_sidecar and metadata["SourceFile"].lower().endswith(".xmp"):
+                                    metadata["SourceFile"] = os.path.splitext(metadata["SourceFile"])[0]
+                                      
+                                new_metadata["SourceFile"] = metadata.get("SourceFile")
+                                
+                                for key, value in metadata.items():
+                                    if key in self.keyword_fields:
+                                        keywords.extend(value)
+                                    if key in self.caption_fields:
+                                        caption = value
+                                    if key in self.identifier_fields:
+                                        identifier = value
+                                    if key in self.status_fields:
+                                        status = value
+                                        
+                                # Standardize the fields                             
+                                if keywords:
+                                    new_metadata["MWG:Keywords"] = keywords
+                                if caption:
+                                    new_metadata["MWG:Description"] = caption
+                                if status:
+                                    new_metadata["XMP:Status"] = status
+                                if identifier:
+                                    new_metadata["XMP:Identifier"] = identifier
+                                    
+                                self.files_processed += 1
+                                
+                                # Save checkpoint before processing file
+                                self._save_file_checkpoint(new_metadata["SourceFile"])
+                                
+                                self.process_file(new_metadata)
+                                
+                                # Clear checkpoint after successful processing
+                                if os.path.exists(self.file_checkpoint_path):
+                                    os.remove(self.file_checkpoint_path)
+
+                            if self.check_pause_stop():
+                                return
+                    
+                    self.update_progress()
+                    
+                except queue.Empty:
+                    continue
+        finally:
+            try:
+                self.et.terminate()
+                self.callback("ExifTool process terminated cleanly")
+                
+            except Exception as e:
+                self.callback(f"Warning: ExifTool termination error: {str(e)}")
+
+            
         
     def get_file_type(self, file_ext):
         """ If the filetype is supported, return the key
@@ -687,98 +869,6 @@ class FileProcessor:
                 return True
         
         return False
-                
-    def process_directory(self, directory):
-        try:
-            while not (self.indexer.indexing_complete and self.metadata_queue.empty()):
-                if self.check_pause_stop():
-                    return
-                
-                try:
-                    directory, files = self.metadata_queue.get(timeout=1)
-                    self.callback(f"Processing directory: {directory}")
-                    self.callback(f"---")
-                    metadata_list = self._get_metadata_batch(files)
-                    
-                    for metadata in metadata_list:
-                        if metadata:
-                            if not self.config.skip_verify:
-                                
-                                # Check if ExifTool returned any Warnings or Errors. It comes as value "0 0 0"
-                                # for number of errors warnings and minor warnings
-                                if "ExifTool:Validate" in metadata:
-                                    errors, warnings, minor = map(int, metadata.get("ExifTool:Validate", "0 0 0").split())
-                                    source_file = metadata.get("SourceFile")
-                                    
-                                    if errors > 0:
-                                        print(f"{source_file}: failed to validate. Skipping!")
-                                        self.callback(f"\n{source_file}: failed to validate. Skipping!")
-                                        self.callback(f"---")
-                                        self.files_processed +=1
-                                        
-                                        continue
-                                                       
-                            keywords = []
-                            status = None
-                            identifier = None
-                            caption = None
-                            
-                            # Make a copy with only the fields we want to write
-                            new_metadata = {}
-                            
-                            # Check if we actually have a sidecar in the path
-                            if self.config.use_sidecar and metadata["SourceFile"].lower().endswith(".xmp"):
-                                
-                                # Remove the xmp so we reference the image
-                                metadata["SourceFile"] = os.path.splitext(metadata["SourceFile"])[0]
-                                  
-                            new_metadata["SourceFile"] = metadata.get("SourceFile")
-                            
-                            for key, value in metadata.items():
-                            
-                                # Collect all keywords
-                                if key in self.keyword_fields:
-                                    keywords.extend(value)
-                            
-                                # Ignore any duplicate captions
-                                if key in self.caption_fields:
-                                    caption = value
-                              
-                                # Processing fields
-                                if key in self.identifier_fields:
-                                    identifier = value
-                                if key in self.status_fields:
-                                    status = value
-                                    
-                            # Standardize the fields                             
-                            if keywords:
-                                new_metadata["MWG:Keywords"] = keywords
-                            if caption:
-                                new_metadata["MWG:Description"] = caption
-                            if status:
-                                new_metadata["XMP:Status"] = status
-                            if identifier:
-                                new_metadata["XMP:Identifier"] = identifier
-                                
-                            self.files_processed += 1
-                            
-                            self.process_file(new_metadata)
-
-                        if self.check_pause_stop():
-                            return
-                    
-                    self.update_progress()
-                    
-                except queue.Empty:
-                    continue
-        finally:
-            try:
-                self.et.terminate()
-                self.callback("ExifTool process terminated cleanly")
-                
-            except Exception as e:
-                self.callback(f"Warning: ExifTool termination error: {str(e)}")
-                
 
     def _get_metadata_batch(self, files):
         """ Get metadata for a batch of files
@@ -831,8 +921,6 @@ class FileProcessor:
             
             
             file_path = metadata["SourceFile"]
-            
-
                 
             # If the file doesn't exist anymore, skip it
             if not os.path.exists(file_path):
@@ -840,7 +928,6 @@ class FileProcessor:
                 self.callback(f"---")
                 return
             
-            # Check UUID and status
             metadata = self.check_uuid(metadata, file_path)
             if not metadata:
                 return
@@ -851,7 +938,6 @@ class FileProcessor:
                 self.callback(f"---")
                 return
                 
-            # Process the file
             start_time = time.time()
             
             processed_image, image_path = self.image_processor.process_image(file_path)
@@ -890,7 +976,6 @@ class FileProcessor:
                     'file_path': file_path
                 }
                 
-                # Send the image data to the callback
                 self.callback(image_data)    
                 
             if not self.config.dry_run:
@@ -921,10 +1006,6 @@ class FileProcessor:
                  
                 self.callback(f"<b>Image:</b> {os.path.basename(file_path)}")
                 self.callback(f"<b>Status:</b> {status}")
-                
-                #if updated_metadata.get("MWG:Description"):
-                    #self.callback(f"<b>Caption:</b> {updated_metadata.get('MWG:Description')}") 
-                    #self.callback(f"<b>Keywords:</b> {updated_metadata.get('MWG:Keywords', '')}")
 
                 self.callback(
                     f"<b>Processing time:</b> {processing_time:.2f}s, <b>Average processing time:</b> {average_time:.2f}s"
@@ -1077,6 +1158,9 @@ class FileProcessor:
 def main(config=None, callback=None, check_paused_or_stopped=None):
     if config is None:
         config = Config.from_args()
+    
+    if not hasattr(config, 'chunk_size'):
+        config.chunk_size = 100
              
     file_processor = FileProcessor(
         config, check_paused_or_stopped, callback
@@ -1084,6 +1168,12 @@ def main(config=None, callback=None, check_paused_or_stopped=None):
     
     try:
         file_processor.process_directory(config.directory)
+    
+    except KeyboardInterrupt:
+        print("Processing interrupted. State saved for resuming later.")
+        
+        if callback:
+            callback("Processing interrupted. State saved for resuming later.")
     
     except Exception as e:
         print(f"An error occurred during processing: {str(e)}")
