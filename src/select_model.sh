@@ -1,5 +1,6 @@
 #!/bin/bash
-
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+REQUIREMENTS_FILE="$SCRIPT_DIR/../requirements.txt"
 VENV_NAME="llmii_env"
 
 # Function to check if a command exists
@@ -70,7 +71,7 @@ fi
 
 source "$VENV_NAME/bin/activate"
 
-if [ ! -f "requirements.txt" ]; then
+if [ ! -f "$REQUIREMENTS_FILE" ]; then
     echo "requirements.txt not found. Please create a requirements.txt file in the same directory as this script."
     exit 1
 fi
@@ -86,7 +87,7 @@ fi
 
 clear
 
-python3 -m src.llmii_setup
+python3 -m src.llmii_setup --update
 
 deactivate
 

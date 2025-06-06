@@ -1,5 +1,6 @@
 #!/bin/bash
-
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+REQUIREMENTS_FILE="$SCRIPT_DIR/../requirements.txt"
 VENV_NAME="llmii_env"
 
 # Function to check if a command exists
@@ -9,6 +10,7 @@ command_exists() {
 
 if ! command_exists python3; then
     echo "Python 3 is not found. Please ensure Python 3 is installed and added to your PATH."
+	read -p "Press Enter to exit..."
     exit 1
 fi
 
@@ -23,6 +25,7 @@ if ! command_exists exiftool; then
             brew install exiftool
         else
             echo "Homebrew not found. Please install Homebrew first, then run 'brew install exiftool'"
+			read -p "Press Enter to exit..."
             exit 1
         fi
     elif [[ "$(uname)" == "Linux" ]]; then
@@ -40,15 +43,18 @@ if ! command_exists exiftool; then
             sudo pacman -S --noconfirm perl-image-exiftool
         else
             echo "Could not determine package manager. Please install exiftool manually."
+			read -p "Press Enter to exit..."
             exit 1
         fi
     else
         echo "Unsupported operating system. Please install exiftool manually."
+		read -p "Press Enter to exit..."
         exit 1
     fi
     
     if ! command_exists exiftool; then
         echo "Failed to install exiftool. Please install it manually."
+		read -p "Press Enter to exit..."
         exit 1
     else
         echo "exiftool has been installed successfully."
@@ -62,6 +68,7 @@ if [ ! -d "$VENV_NAME" ]; then
     python3 -m venv "$VENV_NAME"
     if [ $? -ne 0 ]; then
         echo "Failed to create virtual environment. Please check your Python installation."
+		read -p "Press Enter to exit..."
         exit 1
     fi
 else
@@ -70,8 +77,9 @@ fi
 
 source "$VENV_NAME/bin/activate"
 
-if [ ! -f "requirements.txt" ]; then
-    echo "requirements.txt not found. Please create a requirements.txt file in the same directory as this script."
+if [ ! -f "$REQUIREMENTS_FILE" ]; then
+    echo "requirements.txt not found."
+	read -p "Press Enter to exit..."
     exit 1
 fi
 
@@ -81,6 +89,7 @@ echo "Installing packages from requirements.txt..."
 pip install -r requirements.txt
 if [ $? -ne 0 ]; then
     echo "Failed to install some packages. Please check your internet connection and requirements.txt file."
+	read -p "Press Enter to exit..."
     exit 1
 fi
 

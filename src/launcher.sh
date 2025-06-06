@@ -74,24 +74,24 @@ run_alone() {
 run_gui() {
     echo -e "${CYAN}Launching Python GUI component...${NC}"
     
-    chmod +x "$SCRIPT_DIR/src/gui.sh"
+    chmod +x "$SCRIPT_DIR/gui.sh"
     
-    bash "$SCRIPT_DIR/src/gui.sh"
+    bash "$SCRIPT_DIR/gui.sh"
 }
 
 run_setup() {
     echo -e "${BLUE}Running setup...${NC}"
     
-    chmod +x "$SCRIPT_DIR/src/setup.sh"
+    chmod +x "$SCRIPT_DIR/setup.sh"
     
-    bash "$SCRIPT_DIR/src/setup.sh"
+    bash "$SCRIPT_DIR/setup.sh"
 }
 run_model() {
     echo -e "${BLUE}Model selection starting...${NC}"
     
-    chmod +x "$SCRIPT_DIR/src/select_model.sh"
+    chmod +x "$SCRIPT_DIR/setup.sh"
     
-    bash "$SCRIPT_DIR/src/select_model.sh"
+    bash "$SCRIPT_DIR/setup.sh"
 }
 selection=""
 while [ "$selection" != "q" ]; do

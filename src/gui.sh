@@ -10,16 +10,16 @@ command_exists() {
 
 if ! command_exists python3; then
     echo "Python 3 is not found. Please ensure Python 3 is installed and added to your PATH."
-    read -p "Press Enter to continue..." 
+    read -p "Press Enter to exit..."
     exit 1
 fi
 
 if ! command_exists exiftool; then
-    bash src/setup.sh
+    bash setup.sh
 fi
 
 if [ ! -d "$VENV_NAME" ]; then
-    bash src/setup.sh
+    bash setup.sh
 fi
 
 source "$VENV_NAME/bin/activate"
