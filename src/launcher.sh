@@ -57,7 +57,7 @@ run_with_ai() {
         chmod +x "$EXECUTABLE_PATH"
         
         # Start the process in the background
-        (cd "$WORKING_DIR" && "$EXECUTABLE_PATH" "$MODEL_PARAM" --mmproj "$MMPROJ" --contextsize "$CONTEXTSIZE" --visionmaxres "$VISIONMAXRES" --chatcompletionsadapter "$CHATCOMPLETIONSADAPTER" --flashattention) &
+        (cd "$WORKING_DIR" && "$EXECUTABLE_PATH" "$MODEL_PARAM" --mmproj "$MMPROJ" --contextsize "$CONTEXTSIZE" --visionmaxres "$VISIONMAXRES" --chatcompletionsadapter "$CHATCOMPLETIONSADAPTER") &
         
         run_gui
     else

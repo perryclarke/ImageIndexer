@@ -31,7 +31,6 @@ function Run-WithAI {
                 "--mmproj", $koboldArgs.mmproj,
                 "--contextsize", $koboldArgs.contextsize,
                 "--visionmaxres", $koboldArgs.visionmaxres,
-                "--flashattention",
 				"--chatcompletionsadapter", $koboldArgs.chatcompletionsadapter
             )
             
