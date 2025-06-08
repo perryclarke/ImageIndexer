@@ -793,7 +793,7 @@ class SetupApp:
             "visionmaxres": "9999",
             "chatcompletionsadapter": model["adapter"]
         }
-        full_command = f"{executable_path} {kobold_args['model_param']} --mmproj {kobold_args['mmproj']} --flashattention --contextsize {kobold_args['contextsize']} --visionmaxres 9999 --chatcompletionsadapter {kobold_args['chatcompletionsadapter']}" 
+        full_command = f"{executable_path} {kobold_args['model_param']} --mmproj {kobold_args['mmproj']} --contextsize {kobold_args['contextsize']} --visionmaxres 9999 --chatcompletionsadapter {kobold_args['chatcompletionsadapter']}" 
         
         try:
             with open(full_command_path, "w") as f:
