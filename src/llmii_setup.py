@@ -325,14 +325,14 @@ def determine_kobold_filename(gpu_summary):
     cuda_version = summary["cuda_version"]
     
     if system == "Windows":
-        if cuda_available:
-            major_version = float(cuda_version.split('.')[0])
-            if major_version >= 12:
-                return "koboldcpp_cu12.exe"
-            else:
-                return "koboldcpp.exe"
-        else:
-            return "koboldcpp_nocuda.exe"
+        #if cuda_available:
+        #    major_version = float(cuda_version.split('.')[0])
+        #    if major_version >= 12:
+        return "koboldcpp.exe"
+        #    else:
+        #        return "koboldcpp.exe"
+        #else:
+            #return "koboldcpp_nocuda.exe"
     
     elif system == "Darwin":  # macOS
         if platform.machine() == "arm64":
@@ -344,9 +344,9 @@ def determine_kobold_filename(gpu_summary):
         if cuda_available:
             major_version = float(cuda_version.split('.')[0])
             if major_version >= 12:
-                return "koboldcpp-linux-x64-cuda1210"
+                return "koboldcpp-linux-x64"
             else:
-                return "koboldcpp-linux-x64-cuda1150"
+                return "koboldcpp-linux-x64-oldpc"
         else:
             return "koboldcpp-linux-x64-nocuda"
     
