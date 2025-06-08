@@ -6,22 +6,22 @@ import re
 from pathlib import Path
 import platform
 import requests
-
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QDialog, QVBoxLayout, QHBoxLayout, 
     QLabel, QRadioButton, QPushButton, QProgressBar, QMessageBox,
     QScrollArea, QWidget, QGroupBox, QFrame, QSizePolicy, QSpacerItem,
     QMenuBar, QButtonGroup
-)
+    )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt6.QtGui import QFont, QColor, QPalette, QIcon
+
 from src.config import RESOURCES_DIR
 
 
 # GPU detection logic adapted from koboldcpp.py, by Concedo:
 # https://github.com/LostRuins/koboldcpp/blob/6888f5495d2839b0f590f200299520fa2c156b33/koboldcpp.py#L923C1-L923C48
 # March 24, 2025
-
+ 
 class GpuDetector:
     """Class for detecting GPU capabilities and appropriate backend"""
     
@@ -212,16 +212,33 @@ class GpuDetector:
         return self.summary
 
 
+def is_display_available():
+    """Try to create a QT application to test for display presence"""
+    try:
+        
+        if os.name != 'nt' and not os.environ.get('DISPLAY'):
+            return False
+        
+        from PyQt6.QtWidgets import QApplication
+        import sys
+        
+        if QApplication.instance() is not None:
+            return True
+            
+        test_app = QApplication(sys.argv)
+        test_app.quit()
+        return True
+        
+    except Exception as e:
+        print(f"No display. Proceeding in terminal: {e}")
+        return False
+
+
 def download_file(url, destination):
     """
     Downloads a file from the specified URL to the destination path.
     
-    Parameters:
-        url (str): URL of the file to download
-        destination (str): Path where to save the downloaded file
-    
-    Returns:
-        bool: True if download was successful, False otherwise
+    Returns True if successful
     """
     try:
         print(f"Downloading from {url}...")
@@ -364,26 +381,15 @@ def manage_kobold_executable():
             if match:
                 executable_version = match.group(1).replace('_', '.')
             break
-    #gpu_summary["existing_executable"] = existing_executable
-    #gpu_summary["executable_version"] = executable_version
     return existing_executable
-    
-    # If we found both and the versions match, use the existing executable
-    #if current_version and executable_version and current_version == executable_version:
-        #print(f"Using existing Kobold executable version {current_version}")
-        #return existing_executable
-    #    pass
-    # Otherwise download the latest version
     
 def download_kobold(gpu_summary, existing_executable):
     print("Checking for KoboldCpp update...")
     base_url = "https://github.com/LostRuins/koboldcpp/releases/latest/download/"
     version_file = os.path.join(RESOURCES_DIR, "version.txt")
-    # Determine which file to download
     download_filename = determine_kobold_filename(gpu_summary)
     download_url = base_url + download_filename
     
-    # Set local filename for downloaded file
     extension = '.exe' if download_filename.endswith('.exe') else ''
     temp_download_path = os.path.join(RESOURCES_DIR, download_filename)
     if download_file(download_url, temp_download_path):
@@ -392,11 +398,9 @@ def download_kobold(gpu_summary, existing_executable):
             with open(version_file, 'w') as f:
                 f.write(version)
             
-            # Rename the file to include version
             sanitized_version = sanitize_version(version)
             final_path = os.path.join(RESOURCES_DIR, f"koboldcpp-{sanitized_version}{extension}")
             
-            # Remove old executable if it exists
             if existing_executable and os.path.exists(existing_executable):
                 os.remove(existing_executable)
             
@@ -415,74 +419,171 @@ def download_kobold(gpu_summary, existing_executable):
         else:
             raise FileNotFoundError("No Kobold executable available")
 
-class ProgressDialog(QDialog):
-    """Dialog showing progress of the installation/detection process"""
+
+def list_models_terminal():
+    """List available models in terminal mode"""
+    model_list_path = os.path.join(RESOURCES_DIR, "model_list.json")
+    try:
+        with open(model_list_path, "r") as file:
+            models = json.load(file)
+        
+        print("Available models:")
+        for model in models:
+            print(f"  {model['model']}")
+            print(f"    Description: {model['description']}")
+            print(f"    Size: {model['size_mb']} MB")
+            print()
+    except Exception as e:
+        print(f"Error loading models: {e}")
+        return 1
+
+def run_detection_terminal():
+    """Run GPU detection in terminal mode"""
+    detector = GpuDetector()
+    gpu_summary = detector.detect_all()
+    return 0
+
+def setup_koboldcpp_terminal(model, gpu_summary):
+    """Terminal version of setup_koboldcpp without Qt dependencies"""
+    executable_path = gpu_summary["executable_path"]
+    full_command_path = os.path.join(RESOURCES_DIR, "kobold_command.txt")
+    args_path = os.path.join(RESOURCES_DIR, "kobold_args.json")
     
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("KoboldCPP Setup")
-        self.setFixedSize(500, 300)
-        self.summary = None
+    kobold_args = {
+        "executable": os.path.basename(executable_path),
+        "model_param": model["language_url"],
+        "mmproj": model["mmproj_url"],
+        "flashattention": "",
+        "contextsize": "4096",
+        "visionmaxres": "9999",
+        "chatcompletionsadapter": model["adapter"]
+    }
+    
+    full_command = f"{executable_path} {kobold_args['model_param']} --mmproj {kobold_args['mmproj']} --flashattention --contextsize {kobold_args['contextsize']} --visionmaxres 9999 --chatcompletionsadapter {kobold_args['chatcompletionsadapter']}"
+    
+    try:
+        with open(full_command_path, "w") as f:
+            f.write(full_command)
         
-        layout = QVBoxLayout()
+        with open(args_path, "w") as f:
+            json.dump(kobold_args, f, indent=4)
         
-        # Title
-        title = QLabel("<h2>Setting up KoboldCPP</h2>")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
+        return True
         
-        # Progress log
-        self.log = QLabel("Starting setup process...")
-        self.log.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self.log.setWordWrap(True)
-        layout.addWidget(self.log)
-        
-        # Progress bar
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        layout.addWidget(self.progress_bar)
-        
-        # Cancel button
-        self.cancel_button = QPushButton("Cancel")
-        self.cancel_button.clicked.connect(self.reject)
-        
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-        button_layout.addWidget(self.cancel_button)
-        
-        layout.addLayout(button_layout)
-        
-        self.setLayout(layout)
-        
-    def update_progress(self, message, percent=None):
-        """Update progress display with message and optional percentage"""
-        current_text = self.log.text()
-        self.log.setText(f"{current_text}\n{message}")
-        
-        # Update progress bar if percentage is provided
-        if percent is not None:
-            self.progress_bar.setValue(percent)
-        
-        # Force immediate update of UI
-        QApplication.processEvents()
+    except Exception as e:
+        print(f"Failed to create configuration: {e}")
+        return False
 
+def setup_terminal(update=False, model_name=None):
+    """Run setup in terminal mode"""
+    print("Running in terminal mode (no display detected)")
+    print("=" * 50)
+    
+    model_list_path = os.path.join(RESOURCES_DIR, "model_list.json")
+    try:
+        with open(model_list_path, "r") as file:
+            models = json.load(file)
+    except Exception as e:
+        print(f"Error loading models: {e}")
+        return 1
+    
+    print("Detecting GPU capabilities...")
+    detector = GpuDetector()
+    gpu_summary = detector.detect_all()
+    print()
+    
+    existing_executable = manage_kobold_executable()
+    if update or not existing_executable:
+        print("Getting KoboldCPP executable...")
+        try:
+            gpu_summary["executable_path"] = download_kobold(gpu_summary, existing_executable)
+        except Exception as e:
+            print(f"Failed to download executable: {e}")
+            if existing_executable:
+                print(f"Using existing executable: {existing_executable}")
+                gpu_summary["executable_path"] = existing_executable
+            else:
+                return 1
+    else:
+        gpu_summary["executable_path"] = existing_executable
+        print(f"Using existing executable: {existing_executable}")
+    
+    print()
+    
+    selected_model = None
+    if model_name:
+        for model in models:
+            if model["model"].lower() == model_name.lower():
+                selected_model = model
+                break
+        if not selected_model:
+            print(f"Model '{model_name}' not found.")
+            print("\nAvailable models:")
+            for model in models:
+                print(f"  - {model['model']}: {model['description']} ({model['size_mb']} MB)")
+            return 1
+    else:
+        print("Available models:")
+        for i, model in enumerate(models):
+            fits_vram = (gpu_summary["recommended_backend"] == "CPU" or 
+                        model["size_mb"] <= gpu_summary["total_vram_mb"])
+            
+            status = "✓ Recommended" if fits_vram else "⚠ May exceed VRAM"
+            print(f"  {i+1}. {model['model']}: {model['description']}")
+            print(f"     Size: {model['size_mb']} MB - {status}")
+            print()
+        
+        while True:
+            try:
+                choice = input(f"Select a model (1-{len(models)}): ").strip()
+                if choice.lower() in ['q', 'quit', 'exit']:
+                    print("Setup cancelled.")
+                    return 1
+                
+                choice_idx = int(choice) - 1
+                if 0 <= choice_idx < len(models):
+                    selected_model = models[choice_idx]
+                    break
+                else:
+                    print(f"Please enter a number between 1 and {len(models)}")
+            except ValueError:
+                print("Please enter a valid number (or 'q' to quit)")
+            except KeyboardInterrupt:
+                print("\nSetup cancelled.")
+                return 1
+        
+        print(f"Selected: {selected_model['model']}")
+    
+    print()
+    
+    print("Creating configuration...")
+    success = setup_koboldcpp_terminal(selected_model, gpu_summary)
+    
+    if success:
+        print("Setup completed successfully!")
+        print(f"Configuration saved to: {RESOURCES_DIR}")
+        return 0
+    else:
+        print("Setup failed")
+        return 1
 
-class ModelSelectionDialog(QDialog):
+class ModelSelectionDialog:
     """Dialog for selecting a model based on available VRAM"""
     def __init__(self, models, gpu_summary, parent=None):
-        super().__init__(parent)
+        
+        self.dialog = QDialog(parent)
         self.models = models
         self.gpu_summary = gpu_summary
         self.selected_model = None
         
-        self.setWindowTitle("Select AI Model")
-        self.setMinimumWidth(600)
-        self.setMinimumHeight(400)
+        self.dialog.setWindowTitle("Select AI Model")
+        self.dialog.setMinimumWidth(600)
+        self.dialog.setMinimumHeight(400)
         
         self.setup_ui()
         
     def setup_ui(self):
+        
         layout = QVBoxLayout()
         
         header = QLabel(f"<h2>Select a Model for KoboldCPP</h2>")
@@ -507,7 +608,7 @@ class ModelSelectionDialog(QDialog):
         model_layout = QVBoxLayout()
         
         self.radio_buttons = []
-        self.button_group = QButtonGroup(self)
+        self.button_group = QButtonGroup(self.dialog)
         
         for i, model in enumerate(self.models):
             frame = QFrame()
@@ -553,7 +654,7 @@ class ModelSelectionDialog(QDialog):
         button_layout.addStretch()
         
         cancel_button = QPushButton("Cancel")
-        cancel_button.clicked.connect(self.reject)
+        cancel_button.clicked.connect(self.dialog.reject)
         
         select_button = QPushButton("Select")
         select_button.clicked.connect(self.accept_selection)
@@ -569,27 +670,31 @@ class ModelSelectionDialog(QDialog):
         layout.addSpacing(10)
         layout.addLayout(button_layout)
         
-        self.setLayout(layout)
+        self.dialog.setLayout(layout)
+    
+    def exec(self):
+        return self.dialog.exec()
     
     def accept_selection(self):
         for i, radio in enumerate(self.radio_buttons):
             if radio.isChecked():
                 self.selected_model = self.models[i]
-                self.accept()
+                self.dialog.accept()
                 break
 
-
-class GuiLaunchThread(QThread):
+class GuiLaunchThread:
     """Background thread for launching the GUI"""
     
     def run(self):
-        llmii_gui.run_gui()
-
-
+        
+        thread = QThread()
+        # llmii_gui.run_gui()
+        
 class SetupApp:
     """Main application logic"""
     
     def __init__(self):
+        
         self.app = QApplication(sys.argv)
         self.app.setStyle("Fusion")  # Modern cross-platform style
         self.setup_theme()
@@ -605,6 +710,7 @@ class SetupApp:
         
     def setup_theme(self):
         """Set up dark theme for the application"""
+        
         palette = QPalette()
         palette.setColor(QPalette.ColorRole.Window, QColor(53, 53, 53))
         palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
@@ -623,32 +729,33 @@ class SetupApp:
         self.app.setPalette(palette)
     
     def run_setup(self, update=True):
-        """Run setup and detection process with progress dialog"""
-        progress_dialog = ProgressDialog()
-        progress_dialog.show()
         
-        progress_dialog.update_progress("Detecting GPU capabilities...", 10)
+        """Run setup and detection process with progress dialog"""
+        #progress_dialog = ProgressDialog()
+        #progress_dialog.show()
+        
+        #progress_dialog.update_progress("Detecting GPU capabilities...", 10)
         gpu_summary = self.detector.detect_all()
         
         backend = gpu_summary["recommended_backend"]
-        progress_dialog.update_progress(f"Recommended backend: {backend}", 40)
+        #progress_dialog.update_progress(f"Recommended backend: {backend}", 40)
         
         if gpu_summary["cuda_available"]:
-            progress_dialog.update_progress(
-                f"CUDA {gpu_summary['cuda_version']} detected with {gpu_summary['total_vram_mb']}MB VRAM", 
-                50
-            )
-        
+            #progress_dialog.update_progress(
+            #    f"CUDA {gpu_summary['cuda_version']} detected with {gpu_summary['total_vram_mb']}MB VRAM", 
+            #    50
+            #)
+            print(f"CUDA {gpu_summary['cuda_version']} detected with {gpu_summary['total_vram_mb']}MB VRAM")
         existing_executable = manage_kobold_executable()
         
         if update:
-            progress_dialog.update_progress("Getting KoboldCPP executable...", 60)
+            #progress_dialog.update_progress("Getting KoboldCPP executable...", 60)
             gpu_summary["executable_path"] = download_kobold(gpu_summary, existing_executable)
         
         else:
             gpu_summary["executable_path"] = existing_executable
         
-        progress_dialog.update_progress("Setup completed successfully", 100)
+        #progress_dialog.update_progress("Setup completed successfully", 100)
         
         QApplication.processEvents()
         
@@ -657,12 +764,13 @@ class SetupApp:
         time.sleep(1)
         
         # Hide progress dialog
-        progress_dialog.accept()
+        #progress_dialog.accept()
         
         return gpu_summary
     
     def show_model_selection(self, gpu_summary):
         """Show model selection dialog"""
+        
         dialog = ModelSelectionDialog(self.models, gpu_summary)
         
         if dialog.exec():
@@ -726,17 +834,38 @@ class SetupApp:
 
 
 def setup(update=False):
-    setup = SetupApp()
-    return setup.run(update)
+    """Main setup function"""
+    if is_display_available():
+        
+        setup_app = SetupApp()
+        return setup_app.run(update)
+    else:
+        return setup_terminal(update)
+
     
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Setup Utility for LLMII")
     parser.add_argument("--update", action="store_true", help="Install or Update KoboldCpp executable")
+    parser.add_argument("--force-terminal", action="store_true", help="Force terminal mode even if display available")
+    parser.add_argument("--model", type=str, help="Specify model name for terminal mode")
+    parser.add_argument("--detect-only", action="store_true", help="Only run GPU detection and exit")
+    parser.add_argument("--list-models", action="store_true", help="List available models and exit")
+    
     args = parser.parse_args()
-    setup(args.update)
+    
+    if args.list_models:
+        list_models_terminal()
+        return 0
+    
+    if args.detect_only:
+        run_detection_terminal()
+        return 0
+    
+    if args.force_terminal or not is_display_available():
+        return setup_terminal(args.update, args.model)
+    else:
+        return setup(args.update)
     sys.exit()
-
 if __name__ == "__main__":
     sys.exit(main())
-    

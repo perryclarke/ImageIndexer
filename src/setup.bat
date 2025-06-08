@@ -42,8 +42,8 @@ if not exist "%VENV_NAME%\Scripts\activate.bat" (
 
 call "%VENV_NAME%\Scripts\activate.bat"
 
-if not exist requirements.txt (
-    echo requirements.txt not found. Please create a requirements.txt file in the same directory as this script.
+if not exist requirements.txt (    
+echo requirements.txt not found..
     pause
     exit /b 1
 )
