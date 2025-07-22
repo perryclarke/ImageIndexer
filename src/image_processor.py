@@ -126,6 +126,9 @@ class ImageProcessor:
         try:
             if image_type == "RAW":
                 return self.process_raw_image(file_path)
+            
+            if image_type == "HEIF":
+                register_heif_opener()
                 
             with Image.open(file_path) as img:
                 if img.mode != 'RGB':
